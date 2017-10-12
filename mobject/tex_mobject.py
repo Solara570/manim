@@ -39,6 +39,7 @@ class TexMobject(SVGMobject):
         "organize_left_to_right" : False,
         "propogate_style_to_family" : True,
         "alignment" : "",
+        "encoding"  : "UTF8",
     }
     def __init__(self, *args, **kwargs):
         digest_config(self, kwargs, locals())
@@ -50,7 +51,8 @@ class TexMobject(SVGMobject):
         self.tex_string = self.get_modified_expression()
         file_name = tex_to_svg_file(
             self.tex_string,
-            self.template_tex_file
+            self.template_tex_file,
+            self.encoding,
         )
         SVGMobject.__init__(self, file_name = file_name, **kwargs)
         self.scale(TEX_MOB_SCALE_FACTOR)
@@ -267,7 +269,12 @@ class Brace(TexMobject):
 def tex_hash(expression, template_tex_file):
     return str(hash(expression + template_tex_file))
 
-def tex_to_svg_file(expression, template_tex_file):
+def enc_conv(filename, in_enc, out_enc):
+    content = open(filename).read()
+    conv_content = content.decode(in_enc).encode(out_enc)
+    open(filename, "w").write(conv_content)
+
+def tex_to_svg_file(expression, template_tex_file, encoding):
     image_dir = os.path.join(
         TEX_IMAGE_DIR, 
         tex_hash(expression, template_tex_file)
@@ -275,6 +282,11 @@ def tex_to_svg_file(expression, template_tex_file):
     if os.path.exists(image_dir):
         return get_sorted_image_list(image_dir)
     tex_file = generate_tex_file(expression, template_tex_file)
+    if encoding != "UTF8":
+        try:
+            enc_conv(tex_file, in_enc = "UTF8", out_enc = encoding)
+        except UnicodeEncodeError, UnicodeDecodeError:
+            pass
     dvi_file = tex_to_dvi(tex_file)
     return dvi_to_svg(dvi_file)
 
