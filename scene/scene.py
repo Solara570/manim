@@ -33,6 +33,7 @@ class Scene(object):
         "output_directory" : MOVIE_DIR,
         "name" : None,
         "always_continually_update" : False,
+        "random_seed" : 0,
     }
     def __init__(self, **kwargs):
         digest_config(self, kwargs)
@@ -45,6 +46,9 @@ class Scene(object):
         self.shared_locals = {}
         if self.name is None:
             self.name = self.__class__.__name__
+        if self.random_seed is not None:
+            random.seed(self.random_seed)
+            np.random.seed(self.random_seed)
 
         self.setup()
         if self.write_to_movie:
@@ -61,6 +65,10 @@ class Scene(object):
         """
         pass
 
+    def setup_bases(self):
+        for base in self.__class__.__bases__:
+            base.setup(self)
+
     def construct(self):
         pass #To be implemented in subclasses
 
@@ -71,19 +79,23 @@ class Scene(object):
         self.name = name
         return self
 
-    def update_shared_locals(self, *keys):
+    def set_variables_as_attrs(self, *objects, **newly_named_objects):
         """
-        Often in constructing a scene, it's nice to refer to
-        what was a local variable from a previous subroutine,
-        so a dict of shared_locals is recorded, and it can be updated
-        by passing in the objects directly.
+        This method is slightly hacky, making it a little easier
+        for certain methods (typically subroutines of construct)
+        to share local variables.
         """
         caller_locals = inspect.currentframe().f_back.f_locals
-        self.shared_locals.update(dict([
-            (key, caller_locals[key])
-            for key in keys
-        ]))
+        for key, value in caller_locals.items():
+            for o in objects:
+                if value is o:
+                    setattr(self, key, value)
+        for key, value in newly_named_objects.items():
+            setattr(self, key, value)
         return self
+
+    def get_attrs(self, *keys):
+        return [getattr(self, key) for key in keys]
 
     ### Only these methods should touch the camera
 
@@ -168,12 +180,12 @@ class Scene(object):
         families = [m.submobject_family() for m in mobjects]
         def is_top_level(mobject):
             num_families = sum([
-                (mobject in family) 
+                (mobject in family)
                 for family in families
             ])
             return num_families == 1
         return filter(is_top_level, mobjects)
-        
+
     def separate_mobjects_and_continual_animations(self, mobjects_or_continual_animations):
         mobjects = []
         continual_animations = []
@@ -185,7 +197,7 @@ class Scene(object):
                 continual_animations.append(item)
             else:
                 raise Exception("""
-                    Adding/Removing something which is 
+                    Adding/Removing something which is
                     not a Mobject or a ContinualAnimation
                  """)
         return mobjects, continual_animations
@@ -249,7 +261,7 @@ class Scene(object):
 
     def add_foreground_mobjects(self, *mobjects):
         self.foreground_mobjects = list_update(
-            self.foreground_mobjects, 
+            self.foreground_mobjects,
             mobjects
         )
         self.add(*mobjects)
@@ -319,12 +331,12 @@ class Scene(object):
     def compile_play_args_to_animation_list(self, *args):
         """
         Eacn arg can either be an animation, or a mobject method
-        followed by that methods arguments.  
+        followed by that methods arguments.
 
-        This animation list is built by going through the args list, 
-        and each animation is simply added, but when a mobject method 
-        s hit, a MoveToTarget animation is built using the args that 
-        follow up until either another animation is hit, another method 
+        This animation list is built by going through the args list,
+        and each animation is simply added, but when a mobject method
+        s hit, a MoveToTarget animation is built using the args that
+        follow up until either another animation is hit, another method
         is hit, or the args list runs out.
         """
         animations = []
@@ -341,7 +353,7 @@ class Scene(object):
                 animations.pop()
                 #method should already have target then.
             else:
-                mobject.target = mobject.deepcopy()
+                mobject.target = mobject.copy()
             state["curr_method"].im_func(
                 mobject.target, *state["method_args"]
             )
@@ -361,7 +373,7 @@ class Scene(object):
                 state["method_args"].append(arg)
             elif isinstance(arg, Mobject):
                 raise Exception("""
-                    I think you may have invoked a method 
+                    I think you may have invoked a method
                     you meant to pass in as a Scene.play argument
                 """)
             else:
@@ -471,7 +483,7 @@ class Scene(object):
         name = str(self)
         file_path = self.get_movie_file_path(name, ".mp4")
         temp_file_path = file_path.replace(".mp4", "Temp.mp4")
-        print "Writing to %s"%temp_file_path
+        print("Writing to %s"%temp_file_path)
         self.args_to_rename_file = (temp_file_path, file_path)
 
         fps = int(1/self.frame_duration)
@@ -479,14 +491,14 @@ class Scene(object):
 
         command = [
             FFMPEG_BIN,
-            '-y',                 # overwrite output file if it exists
+            '-y', # overwrite output file if it exists
             '-f', 'rawvideo',
             '-vcodec','rawvideo',
             '-s', '%dx%d'%(width, height), # size of one frame
             '-pix_fmt', 'rgba',
             '-r', str(fps), # frames per second
-            '-i', '-',      # The imput comes from a pipe
-            '-an',          # Tells FFMPEG not to expect any audio
+            '-i', '-', # The imput comes from a pipe
+            '-an', # Tells FFMPEG not to expect any audio
             '-vcodec', 'mpeg',
             '-c:v', 'libx264',
             '-pix_fmt', 'yuv420p',
@@ -502,29 +514,3 @@ class Scene(object):
             shutil.move(*self.args_to_rename_file)
         else:
             os.rename(*self.args_to_rename_file)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -82,12 +82,10 @@ class Write(ShowCreation):
 
     def establish_run_time(self, mobject):
         num_subs = len(mobject.family_members_with_points())
-        if num_subs < 5:
+        if num_subs < 15:
             self.run_time = 1
-        elif num_subs < 15:
-            self.run_time = 2
         else:
-            self.run_time = 3
+            self.run_time = 2
 
 class DrawBorderThenFill(Animation):
     CONFIG = {
@@ -255,6 +253,7 @@ class UpdateFromAlphaFunc(UpdateFromFunc):
     def update_mobject(self, alpha):
         self.update_function(self.mobject, alpha)
 
+
 class MaintainPositionRelativeTo(Animation):
     CONFIG = {
         "tracked_critical_point" : ORIGIN
@@ -330,9 +329,9 @@ class LaggedStart(Animation):
             anim.update(alpha)
         return self
 
-    # def clean_up(self, *args, **kwargs):
-    #     for anim in self.subanimations:
-    #         anim.clean_up(*args, **kwargs)
+    def clean_up(self, *args, **kwargs):
+        for anim in self.subanimations:
+            anim.clean_up(*args, **kwargs)
 
 class DelayByOrder(Animation):
     """

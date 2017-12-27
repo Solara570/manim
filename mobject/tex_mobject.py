@@ -13,7 +13,7 @@ class TexSymbol(VMobjectFromSVGPathstring):
     def pointwise_become_partial(self, mobject, a, b):
         #TODO, this assumes a = 0
         if b < 0.5:
-            b = 2*b 
+            b = 2*b
             added_width = 1
             opacity = 0
         else:
@@ -25,7 +25,6 @@ class TexSymbol(VMobjectFromSVGPathstring):
         )
         self.set_stroke(width = added_width + mobject.get_stroke_width())
         self.set_fill(opacity = opacity)
-
 
 class TexMobject(SVGMobject):
     CONFIG = {
@@ -118,7 +117,7 @@ class TexMobject(SVGMobject):
 
     def handle_multiple_args(self):
         """
-        Reorganize existing submojects one layer 
+        Reorganize existing submojects one layer
         deeper based on the structure of args (as a list of strings)
         """
         new_submobjects = []
@@ -191,7 +190,7 @@ class TexMobject(SVGMobject):
 
     def add_background_rectangle(self, color = BLACK, opacity = 0.75):
         self.background_rectangle = BackgroundRectangle(
-            self, color = color, 
+            self, color = color,
             fill_opacity = opacity
         )
         letters = VMobject(*self.submobjects)
@@ -235,8 +234,8 @@ class Brace(TexMobject):
     def put_at_tip(self, mob, use_next_to = True, **kwargs):
         if use_next_to:
             mob.next_to(
-                self.get_tip(), 
-                np.round(self.get_direction()), 
+                self.get_tip(),
+                np.round(self.get_direction()),
                 **kwargs
             )
         else:
@@ -266,6 +265,43 @@ class Brace(TexMobject):
         vect = self.get_tip() - self.get_center()
         return vect/np.linalg.norm(vect)
 
+class BulletedList(TextMobject):
+    CONFIG = {
+        "buff" : MED_LARGE_BUFF,
+        "dot_scale_factor" : 2,
+        #Have to include because of handle_multiple_args implementation
+        "template_tex_file" : TEMPLATE_TEXT_FILE,
+        "alignment" : "",
+    }
+    def __init__(self, *items, **kwargs):
+        line_separated_items = [s + "\\\\" for s in items]
+        TextMobject.__init__(self, *line_separated_items, **kwargs)
+        for part in self:
+            dot = TexMobject("\\cdot").scale(self.dot_scale_factor)
+            dot.next_to(part[0], LEFT, SMALL_BUFF)
+            part.add_to_back(dot)
+        self.arrange_submobjects(
+            DOWN, 
+            aligned_edge = LEFT,
+            buff = self.buff
+        )
+
+    def fade_all_but(self, index_or_string, opacity = 0.5):
+        arg = index_or_string
+        if isinstance(arg, str):
+            part = self.get_part_by_tex(arg)
+        elif isinstance(arg, int):
+            part = self.submobjects[arg]
+        else:
+            raise Exception("Expected int or string, got {0}".format(arg))
+        for other_part in self.submobjects:
+            if other_part is part:
+                other_part.set_fill(opacity = 1)
+            else:
+                other_part.set_fill(opacity = opacity)
+
+##########
+
 def tex_hash(expression, template_tex_file):
     return str(hash(expression + template_tex_file))
 
@@ -276,7 +312,7 @@ def enc_conv(filename, in_enc, out_enc):
 
 def tex_to_svg_file(expression, template_tex_file, encoding):
     image_dir = os.path.join(
-        TEX_IMAGE_DIR, 
+        TEX_IMAGE_DIR,
         tex_hash(expression, template_tex_file)
     )
     if os.path.exists(image_dir):
@@ -292,13 +328,13 @@ def tex_to_svg_file(expression, template_tex_file, encoding):
 
 def generate_tex_file(expression, template_tex_file):
     result = os.path.join(
-        TEX_DIR, 
+        TEX_DIR,
         tex_hash(expression, template_tex_file)
     ) + ".tex"
     if not os.path.exists(result):
-        print "Writing \"%s\" to %s"%(
+        print("Writing \"%s\" to %s"%(
             "".join(expression), result
-        )
+        ))
         with open(template_tex_file, "r") as infile:
             body = infile.read()
             body = body.replace(TEX_TEXT_TO_REPLACE, expression)
@@ -315,8 +351,8 @@ def tex_to_dvi(tex_file):
     result = tex_file.replace(".tex", ".dvi")
     if not os.path.exists(result):
         commands = [
-            "latex", 
-            "-interaction=batchmode", 
+            "latex",
+            "-interaction=batchmode",
             "-halt-on-error",
             "-output-directory=" + TEX_DIR,
             tex_file,
@@ -337,7 +373,7 @@ def tex_to_dvi(tex_file):
 
 def dvi_to_svg(dvi_file, regen_if_exists = False):
     """
-    Converts a dvi, which potentially has multiple slides, into a 
+    Converts a dvi, which potentially has multiple slides, into a
     directory full of enumerated pngs corresponding with these slides.
     Returns a list of PIL Image objects for these images sorted as they
     where in the dvi
@@ -357,17 +393,3 @@ def dvi_to_svg(dvi_file, regen_if_exists = False):
         ]
         os.system(" ".join(commands))
     return result
-
-
-
-
-
-
-
-
-
-
-
-
-
-

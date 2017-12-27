@@ -37,7 +37,6 @@ def play_chord(*nums):
 def play_error_sound():
     play_chord(11, 8, 6, 1)
 
-
 def play_finish_sound():
     play_chord(12, 9, 5, 2)
 
@@ -183,7 +182,7 @@ def partial_bezier_points(points, a, b):
         for i in range(len(points))
     ])
     return np.array([
-        bezier(a_to_1[:i+1])(b)
+        bezier(a_to_1[:i+1])((b-a)/(1.-a))
         for i in range(len(points))
     ])
 
@@ -422,7 +421,7 @@ def get_full_image_path(image_file_name):
     for path in possible_paths:
         if os.path.exists(path):
             return path
-    raise IOError("File not Found")
+    raise IOError("File %s not Found"%image_file_name)
 
 def drag_pixels(frames):
     curr = frames[0]
