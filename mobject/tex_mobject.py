@@ -38,7 +38,7 @@ class TexMobject(SVGMobject):
         "organize_left_to_right" : False,
         "propogate_style_to_family" : True,
         "alignment" : "",
-        "encoding"  : "UTF8",
+        "encoding"  : "GBK",
     }
     def __init__(self, *args, **kwargs):
         digest_config(self, kwargs, locals())
@@ -306,7 +306,7 @@ def tex_hash(expression, template_tex_file):
     return str(hash(expression + template_tex_file))
 
 def enc_conv(filename, in_enc, out_enc):
-    content = open(filename).read()
+    content = open(filename, "r").read()
     conv_content = content.decode(in_enc).encode(out_enc)
     open(filename, "w").write(conv_content)
 
@@ -321,7 +321,7 @@ def tex_to_svg_file(expression, template_tex_file, encoding):
     if encoding != "UTF8":
         try:
             enc_conv(tex_file, in_enc = "UTF8", out_enc = encoding)
-        except UnicodeEncodeError, UnicodeDecodeError:
+        except:
             pass
     dvi_file = tex_to_dvi(tex_file)
     return dvi_to_svg(dvi_file)
