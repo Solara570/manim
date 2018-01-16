@@ -96,7 +96,7 @@ class Mobject(object):
 
     def save_image(self, name = None):
         self.get_image().save(
-            os.path.join(MOVIE_DIR, (name or str(self)) + ".png")
+            os.path.join(ANIMATIONS_DIR, (name or str(self)) + ".png")
         )
 
     def copy(self):
@@ -384,6 +384,10 @@ class Mobject(object):
         self.shift(mobject.get_center() - self.get_center())
         return self
 
+    def surround(self, mobject, dim_to_match = 0, stretch = False, buffer_factor = 1.2):
+        self.replace(mobject, dim_to_match, stretch)
+        self.scale_in_place(buffer_factor)
+
     def position_endpoints_on(self, start, end):
         curr_vect = self.points[-1] - self.points[0]
         if np.all(curr_vect == 0):
@@ -492,9 +496,12 @@ class Mobject(object):
             return 0
 
     def get_merged_array(self, array_attr):
-        result = np.zeros((0, self.dim))
+        result = None
         for mob in self.family_members_with_points():
-            result = np.append(result, getattr(mob, array_attr), 0)
+            if result is None:
+                result = getattr(mob, array_attr)
+            else:
+                result = np.append(result, getattr(mob, array_attr), 0)
         return result
 
     def get_all_points(self):

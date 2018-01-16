@@ -30,7 +30,9 @@ class Scene(object):
         "skip_animations"  : False,
         "write_to_movie"   : False,
         "save_frames"      : False,
-        "output_directory" : MOVIE_DIR,
+        "save_pngs"        : False,
+        "pngs_mode"        : "RGBA",
+        "output_directory" : ANIMATIONS_DIR,
         "name" : None,
         "always_continually_update" : False,
         "random_seed" : 0,
@@ -44,6 +46,7 @@ class Scene(object):
         self.num_plays = 0
         self.saved_frames = []
         self.shared_locals = {}
+        self.frame_num = 0
         if self.name is None:
             self.name = self.__class__.__name__
         if self.random_seed is not None:
@@ -151,7 +154,7 @@ class Scene(object):
         wind_down_time = kwargs.get("wind_down_time", 1)
         for continual_animation in continual_animations:
             continual_animation.begin_wind_down(wind_down_time)
-        self.dither(wind_down_time)
+        self.wait(wind_down_time)
         #TODO, this is not done with the remove method so as to
         #keep the relevant mobjects.  Better way?
         self.continual_animations = filter(
@@ -419,7 +422,7 @@ class Scene(object):
             return self.mobjects_from_last_animation
         return []
 
-    def dither(self, duration = DEFAULT_DITHER_TIME):
+    def wait(self, duration = DEFAULT_wait_TIME):
         if self.skip_animations:
             return self
 
@@ -447,6 +450,9 @@ class Scene(object):
     def add_frames(self, *frames):
         if self.write_to_movie:
             for frame in frames:
+                if self.save_pngs:
+                    self.save_image("frame" + str(self.frame_num), self.pngs_mode, True)
+                    self.frame_num = self.frame_num + 1
                 self.writing_process.stdin.write(frame.tostring())
         if self.save_frames:
             self.saved_frames += list(frames)
@@ -459,14 +465,19 @@ class Scene(object):
 
     def preview(self):
         TkSceneRoot(self)
+    
+    def save_image(self, name = None, mode = "RGB", dont_update = False):
+        folder = "images"
+        if dont_update:
+            folder = str(self)
 
-    def save_image(self, name = None, mode = "RGB"):
-        path = os.path.join(self.output_directory, "images")
+        path = os.path.join(self.output_directory, folder)
         file_name = (name or str(self)) + ".png"
         full_path = os.path.join(path, file_name)
         if not os.path.exists(path):
             os.makedirs(path)
-        self.update_frame()
+        if not dont_update:
+            self.update_frame()
         image = self.get_image()
         image = image.convert(mode)
         image.save(full_path)
@@ -488,7 +499,7 @@ class Scene(object):
 
         fps = int(1/self.frame_duration)
         height, width = self.camera.pixel_shape
-
+        
         command = [
             FFMPEG_BIN,
             '-y', # overwrite output file if it exists
@@ -505,6 +516,8 @@ class Scene(object):
             '-loglevel', 'error',
             temp_file_path,
         ]
+        
+        # self.writing_process = sp.Popen(command, stdin=sp.PIPE, shell=True)
         self.writing_process = sp.Popen(command, stdin=sp.PIPE)
 
     def close_movie_pipe(self):

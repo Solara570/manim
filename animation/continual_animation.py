@@ -106,12 +106,13 @@ class ContinualUpdateFromFunc(ContinualAnimation):
         self.func(*args[:self.func_arg_count])
 
 class ContinualMaintainPositionRelativeTo(ContinualAnimation):
+    # TODO: Possibly reimplement using CycleAnimation?
     def __init__(self, mobject, tracked_mobject, **kwargs):
         self.anim = MaintainPositionRelativeTo(mobject, tracked_mobject, **kwargs)
         ContinualAnimation.__init__(self, mobject, **kwargs)
 
     def update_mobject(self, dt):
-        self.anim.update(0)
+        self.anim.update(0) # 0 is arbitrary
 
 class NormalAnimationAsContinualAnimation(ContinualAnimation):
     CONFIG = {
@@ -127,7 +128,15 @@ class NormalAnimationAsContinualAnimation(ContinualAnimation):
             min(float(self.internal_time)/self.animation.run_time, 1)
         )
 
+class CycleAnimation(ContinualAnimation):
+    def __init__(self, animation, **kwargs):
+        self.animation = animation
+        ContinualAnimation.__init__(self, animation.mobject, **kwargs)
 
+    def update_mobject(self, dt):
+        mod_value = self.internal_time % self.animation.run_time
+        alpha = mod_value/float(self.animation.run_time)
+        self.animation.update(alpha)
 
 
 

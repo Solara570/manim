@@ -6,7 +6,8 @@ from mobject.svg_mobject import SVGMobject
 from mobject.tex_mobject import TextMobject, TexMobject
 
 from animation import Animation
-from animation.simple_animations import Rotating
+from animation.simple_animations import Rotating, LaggedStart
+from animation.transform import ApplyMethod
 
 from topics.geometry import Circle, Line, Rectangle, Square, \
     Arc, Polygon, SurroundingRectangle
@@ -153,7 +154,7 @@ class PartyHat(SVGMobject):
         "pi_creature" : None,
         "stroke_width" : 0,
         "fill_opacity" : 1,
-        "propogate_style_to_family" : True,
+        "propagate_style_to_family" : True,
         "frills_colors" : [MAROON_B, PURPLE],
         "cone_color" : GREEN,
         "dots_colors" : [YELLOW],
@@ -255,7 +256,7 @@ class PatreonLogo(SVGMobject):
         "fill_opacity" : 1,
         "stroke_width" : 0,
         "width" : 4,
-        "propogate_style_to_family" : True
+        "propagate_style_to_family" : True
     }
     def __init__(self, **kwargs):
         SVGMobject.__init__(self, **kwargs)
@@ -312,7 +313,7 @@ class Headphones(SVGMobject):
 
 class Clock(VGroup):
     CONFIG = {
-        "propogate_style_to_family" : True,
+        "propagate_style_to_family" : True,
     }
     def __init__(self, **kwargs):
         circle = Circle()
@@ -377,7 +378,7 @@ class Bubble(SVGMobject):
         "width"  : 8,
         "bubble_center_adjustment_factor" : 1./8,
         "file_name" : None,
-        "propogate_style_to_family" : True,
+        "propagate_style_to_family" : True,
         "fill_color" : BLACK,
         "fill_opacity" : 0.8,
         "stroke_color" : WHITE,
@@ -387,7 +388,11 @@ class Bubble(SVGMobject):
         digest_config(self, kwargs, locals())
         if self.file_name is None:
             raise Exception("Must invoke Bubble subclass")
-        SVGMobject.__init__(self, **kwargs)
+        try:
+            SVGMobject.__init__(self, **kwargs)
+        except IOError as err:
+            self.file_name = os.path.join(FILE_DIR, self.file_name)
+            SVGMobject.__init__(self, **kwargs)
         self.center()
         self.stretch_to_fit_height(self.height)
         self.stretch_to_fit_width(self.width)
@@ -483,3 +488,53 @@ class ThoughtBubble(Bubble):
     def make_green_screen(self):
         self.submobjects[-1].set_fill(GREEN_SCREEN, opacity = 1)
         return self
+
+
+#TODO: Where should this live?
+class Broadcast(LaggedStart):
+    CONFIG = {
+        "small_radius" : 0.0,
+        "big_radius" : 5,
+        "n_circles" : 5,
+        "remover" : True,
+        "lag_ratio" : 0.7,
+        "run_time" : 3,
+        "remover" : True,
+    }
+    def __init__(self, focal_point, **kwargs):
+        digest_config(self, kwargs)
+        circles = VGroup()
+        for x in range(self.n_circles):
+            circle = Circle(
+                radius = self.big_radius, 
+                stroke_color = BLACK,
+                stroke_width = 0,
+            )
+            circle.move_to(focal_point)
+            circle.save_state()
+            circle.scale_to_fit_width(self.small_radius*2)
+            circle.set_stroke(WHITE, 8)
+            circles.add(circle)
+        LaggedStart.__init__(
+            self, ApplyMethod, circles,
+            lambda c : (c.restore,),
+            **kwargs
+
+        )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

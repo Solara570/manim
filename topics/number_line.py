@@ -23,7 +23,7 @@ class NumberLine(VMobject):
         "line_to_number_vect" : DOWN,
         "line_to_number_buff" : MED_SMALL_BUFF,
         "include_tip" : False,
-        "propogate_style_to_family" : True,
+        "propagate_style_to_family" : True,
     }
     def __init__(self, **kwargs):
         digest_config(self, kwargs)
@@ -135,12 +135,15 @@ class UnitInterval(NumberLine):
 
 class Axes(VGroup):
     CONFIG = {
-        "propogate_style_to_family" : True,
+        "propagate_style_to_family" : True,
         "three_d" : False,
         "number_line_config" : {
             "color" : LIGHT_GREY,
             "include_tip" : True,
         },
+        "x_axis_config" : {},
+        "y_axis_config" : {},
+        "z_axis_config" : {},
         "x_min" : -SPACE_WIDTH,
         "x_max" : SPACE_WIDTH,
         "y_min" : -SPACE_HEIGHT,
@@ -151,27 +154,36 @@ class Axes(VGroup):
     }
     def __init__(self, **kwargs):
         VGroup.__init__(self, **kwargs)
-        self.x_axis = NumberLine(
-            x_min = self.x_min,
-            x_max = self.x_max,
-            **self.number_line_config
-        )
-        self.y_axis = NumberLine(
-            x_min = self.y_min,
-            x_max = self.y_max,
-            **self.number_line_config
-        )
+        self.x_axis = self.get_axis(self.x_min, self.x_max, self.x_axis_config)
+        self.y_axis = self.get_axis(self.y_min, self.y_max, self.y_axis_config)
         self.y_axis.rotate(np.pi/2)
         self.add(self.x_axis, self.y_axis)
         if self.three_d:
-            self.z_axis = NumberLine(
-                x_min = self.z_min,
-                x_max = self.z_max,
-                **self.number_line_config
-            )
+            self.z_axis = self.get_axis(self.z_min, self.z_max, self.z_axis_config)
             self.z_axis.rotate(-np.pi/2, UP)
             self.z_axis.rotate(angle_of_vector(self.z_normal), OUT)
             self.add(self.z_axis)
+
+    def get_axis(self, min_val, max_val, extra_config):
+        config = dict(self.number_line_config)
+        config.update(extra_config)
+        return NumberLine(x_min = min_val, x_max = max_val, **config)
+
+    def coords_to_point(self, x, y):
+        origin = self.x_axis.number_to_point(0)
+        x_axis_projection = self.x_axis.number_to_point(x)
+        y_axis_projection = self.y_axis.number_to_point(y)
+        return x_axis_projection + y_axis_projection - origin
+
+    def get_graph(self, function, num_graph_points = 40, **kwargs):
+        kwargs["fill_opacity"] = kwargs.get("fill_opacity", 0)
+        graph = VMobject(**kwargs)
+        graph.set_points_smoothly([
+            self.coords_to_point(x, function(x))
+            for x in np.linspace(self.x_min, self.x_max, num_graph_points)
+        ])
+        graph.underlying_function = function
+        return graph
 
 class ThreeDAxes(Axes):
     CONFIG = {
@@ -197,9 +209,8 @@ class NumberPlane(VMobject):
         "y_line_frequency" : 1,
         "secondary_line_ratio" : 1,
         "written_coordinate_height" : 0.2,
-        "propogate_style_to_family" : False,
+        "propagate_style_to_family" : False,
     }
-    
     def generate_points(self):
         if self.x_radius is None:
             center_to_edge = (SPACE_WIDTH + abs(self.center_point[0])) 

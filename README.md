@@ -16,6 +16,7 @@ Manim dependencies rely on system libraries you will need to install on your
 operating system:
 * ffmpeg
 * latex
+* sox
 
 Then you can install the python dependencies:
 ```sh
@@ -36,7 +37,7 @@ python extract_scene.py -p example_scenes.py SquareToCircle
 
 `-p` gives a preview of an animation, `-w` will write it to a file, and `-s` will show/save the final image in the animation.
 
-You will probably want to change the MOVIE_DIR constant to be whatever direction you want video files to output to.
+You will probably want to change the ANIMATIONS_DIR constant to be whatever direction you want video files to output to.
 
 Look through the old_projects folder to see the code for previous 3b1b videos.  
 

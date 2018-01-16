@@ -47,6 +47,13 @@ class Circle(Arc):
     def __init__(self, **kwargs):
         Arc.__init__(self, 2*np.pi, **kwargs)
 
+    def surround(self, mobject, dim_to_match = 0, stretch = False, buffer_factor = 1.2):
+        # Ignores dim_to_match and stretch; result will always be a circle
+        # TODO: Perhaps create an ellipse class to handle singele-dimension stretching
+        self.replace(mobject, dim_to_match, stretch)
+        self.scale_to_fit_width(np.sqrt(mobject.get_width()**2 + mobject.get_height()**2))
+        self.scale(buffer_factor)
+
 class Dot(Circle):
     CONFIG = {
         "radius"       : 0.08,
@@ -213,7 +220,7 @@ class DashedLine(Line):
         return self
 
     def get_start(self):
-        if len(self) > 0:
+        if len(self.points) > 0:
             return self[0].points[0]
         else:
             return self.start
@@ -232,7 +239,7 @@ class Arrow(Line):
         "max_tip_length_to_length_ratio" : 0.35,
         "max_stem_width_to_tip_width_ratio" : 0.3,
         "buff" : MED_SMALL_BUFF,
-        "propogate_style_to_family" : False,
+        "propagate_style_to_family" : False,
         "preserve_tip_size_when_scaling" : True,
         "normal_vector" : OUT,
         "use_rectangular_stem" : True,

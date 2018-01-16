@@ -13,7 +13,7 @@ from animation.simple_animations import Write, ShowCreation, AnimationGroup
 from scene import Scene
 
 
-PI_CREATURE_DIR = os.path.join(IMAGE_DIR, "PiCreature")
+PI_CREATURE_DIR = os.path.join(MEDIA_DIR, "designs", "PiCreature")
 PI_CREATURE_SCALE_FACTOR = 0.5
 
 LEFT_EYE_INDEX    = 0
@@ -30,7 +30,7 @@ class PiCreature(SVGMobject):
         "stroke_width" : 0,
         "stroke_color" : BLACK,
         "fill_opacity" : 1.0,
-        "propogate_style_to_family" : True,
+        "propagate_style_to_family" : True,
         "height" : 3,
         "corner_scale_factor" : 0.75,
         "flip_at_start" : False,
@@ -51,7 +51,7 @@ class PiCreature(SVGMobject):
         except:
             warnings.warn("No PiCreature design with mode %s"%mode)
             svg_file = os.path.join(
-                PI_CREATURE_DIR, 
+                FILE_DIR, 
                 "PiCreatures_plain.svg"
             )
             SVGMobject.__init__(self, file_name = svg_file, **kwargs)
@@ -385,7 +385,7 @@ class RemovePiCreatureBubble(AnimationGroup):
 
 class PiCreatureScene(Scene):
     CONFIG = {
-        "total_dither_time" : 0,
+        "total_wait_time" : 0,
         "seconds_to_blink" : 3,
         "pi_creatures_start_on_screen" : True,
     }
@@ -564,21 +564,21 @@ class PiCreatureScene(Scene):
         ])
         return self
 
-    def dither(self, time = 1, blink = True):
+    def wait(self, time = 1, blink = True):
         while time >= 1:
-            time_to_blink = self.total_dither_time%self.seconds_to_blink == 0
+            time_to_blink = self.total_wait_time%self.seconds_to_blink == 0
             if blink and self.any_pi_creatures_on_screen() and time_to_blink:
                 self.blink()
             else:
-                self.non_blink_dither()
+                self.non_blink_wait()
             time -= 1
-            self.total_dither_time += 1
+            self.total_wait_time += 1
         if time > 0:
-            self.non_blink_dither(time)
+            self.non_blink_wait(time)
         return self
 
-    def non_blink_dither(self, time = 1):
-        Scene.dither(self, time)
+    def non_blink_wait(self, time = 1):
+        Scene.wait(self, time)
         return self
 
     def change_mode(self, mode):
