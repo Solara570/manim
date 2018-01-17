@@ -515,18 +515,22 @@ class BreakApartSum(Scene):
         self.play(Blink(randy))
         self.wait()
 
-class Quadrant(Mobject1D):
+class Quadrant(VMobject):
     CONFIG = {
         "radius" : 2,
-        "stroke_width": 2,
-        "density" : 45,
+        "stroke_width": 0,
+        "fill_opacity" : 1,
+        "density" : 50,
+        "density_exp" : 2.0,
     }
     def generate_points(self):
-        self.add_points([
-            r*(np.cos(theta)*RIGHT + np.sin(theta)*UP)
-            for r in np.arange(0, self.radius, self.epsilon)
-            for theta in np.arange(0, np.pi/2, self.epsilon/r)
-        ])        
+        points = [r*RIGHT for r in np.arange(0, self.radius, 1./self.density)]
+        points += [
+            self.radius*(np.cos(theta)*RIGHT + np.sin(theta)*UP)
+            for theta in np.arange(0, TAU/4, 1./(self.radius*self.density))
+        ]
+        points += [r*UP for r in np.arange(self.radius, 0, -1./self.density)]
+        self.set_points_smoothly(points)
 
 class UnmixMixedPaint(Scene):
     CONFIG = {
@@ -534,53 +538,49 @@ class UnmixMixedPaint(Scene):
     }
     def construct(self):
         angles = np.arange(4)*np.pi/2
-        quadrants = PMobject(*[
+        quadrants = VGroup(*[
             Quadrant().rotate(angle).highlight(color)
             for color, angle in zip(self.colors, angles)
         ])
-        quadrants.ingest_submobjects()
-        quadrants.sort_points(lambda p : np.random.random())
-
+        quadrants.add(*it.chain(*[
+            quadrants.copy().rotate(angle)
+            for angle in np.linspace(0, 0.02*TAU, 10)
+        ]))
+        quadrants.set_fill(opacity = 0.5)
 
         mud_color = average_color(*self.colors)
-        background_circle = Circle(
-            radius = 2, 
-            stroke_width = 0,
-            fill_color = mud_color,
-            fill_opacity = 1
-        )
+        mud_circle = Circle(radius = 2, stroke_width = 0)
+        mud_circle.set_fill(mud_color, 1)
+        mud_circle.save_state()
+        mud_circle.scale(0)
 
-        # start_rgbas = np.array(quadrants.rgbas)
-        # target_rgbas = np.zeros(start_rgbas.shape)
-        # target_rgbas[:,:] = color_to_rgba(mud_color)
-        # def update_color(quadrants, alpha):
-        #     quadrants.rgbas = interpolate(start_rgbas, target_rgbas, alpha)
+        def update_quadrant(quadrant, alpha):
+            points = quadrant.get_anchors()
+            dt = 0.03 #Hmm, this has no dependency on frame rate...
+            norms = np.apply_along_axis(np.linalg.norm, 1, points)
 
-        dot = Dot()
-        permutation = range(len(quadrants.points))
-        random.shuffle(permutation)
-        def update_quadrants(quadrants, alpha):
-            points = quadrants.points
-            points += dot.get_center()
-            points[:,0] -= points[:,1]
-            points -= dot.get_center()
+            points[:,0] -= dt*points[:,1]/np.clip(norms, 0.1, np.inf)
+            points[:,1] += dt*points[:,0]/np.clip(norms, 0.1, np.inf)
 
-            quadrants.points = interpolate(
-                quadrants.points, quadrants.points[permutation],
-                0.01,
-            )
-
+            new_norms = np.apply_along_axis(np.linalg.norm, 1, points)
+            new_norms = np.clip(new_norms, 0.001, np.inf)
+            radius = np.max(norms)
+            multiplier = norms/new_norms
+            multiplier = multiplier.reshape((len(multiplier), 1))
+            multiplier.repeat(points.shape[1], axis = 1)
+            points *= multiplier
+            quadrant.set_points_smoothly(points)
 
         self.add(quadrants)
+        run_time = 30
         self.play(
-            # PhaseFlow(
-            #     lambda p : rotate_vector(p, np.pi/2+0.01)/(max(np.linalg.norm(p), 0.001)),
-            #     quadrants,
-            #     virtual_time = 20,
-            # ),
-            # UpdateFromAlphaFunc(quadrants, update_color),
-            UpdateFromAlphaFunc(quadrants, update_quadrants),
-            run_time = 3,
+            *[
+                UpdateFromAlphaFunc(quadrant, update_quadrant)
+                for quadrant in quadrants
+            ] + [
+                ApplyMethod(mud_circle.restore, rate_func = None)
+            ],
+            run_time = run_time
         )
 
 #Incomplete, and probably not useful
@@ -646,15 +646,373 @@ class MachineThatTreatsOneFrequencyDifferently(Scene):
 
 class FourierMachineScene(Scene):
     CONFIG = {
-
+        "time_axes_config" : {
+            "x_min" : 0,
+            "x_max" : 3.4,
+            "x_axis_config" : {
+                "unit_size" : 3,
+                "tick_frequency" : 0.25,
+                "numbers_with_elongated_ticks" : [1, 2, 3],
+            },
+            "y_min" : 0,
+            "y_max" : 2,
+            "y_axis_config" : {"unit_size" : 0.8},
+        },
+        "circle_plane_config" : {
+            "x_radius" : 2,
+            "y_radius" : 2,
+        },
+        "text_scale_val" : 0.75,
+        "default_graph_config" : {
+            "num_graph_points" : 100,
+            "color" : YELLOW,
+        },
+        "equilibrium_height" : 1,
+        "default_y_vector_animation_config" : {
+            "run_time" : 5,
+            "rate_func" : None,
+            "remover" : True,
+        },
+        "default_time_sweep_config" : {
+            "rate_func" : None,
+            "run_time" : 5,
+        },
     }
-    def get_time_graph_axes(self):
-        pass
 
+    def get_time_axes(self):
+        time_axes = Axes(**self.time_axes_config)
+        time_axes.x_axis.add_numbers()
+        time_label = TextMobject("Time")
+        intensity_label = TextMobject("Intensity")
+        labels = VGroup(time_label, intensity_label)
+        for label in labels:
+            label.scale(self.text_scale_val)
+        time_label.next_to(time_axes.x_axis.get_right(), DOWN)
+        intensity_label.next_to(
+            time_axes.y_axis.get_top(), RIGHT,
+            aligned_edge = UP,
+        )
+        time_axes.labels = labels
+        time_axes.add(labels)
+        time_axes.to_corner(UP+LEFT)
+        self.time_axes = time_axes
+        return time_axes
 
-class FourierMachineSceneTest(FourierMachineScene):
+    def get_circle_plane(self):
+        circle_plane = NumberPlane(**self.circle_plane_config)
+        circle_plane.to_corner(DOWN+LEFT)
+        circle = DashedLine(ORIGIN, TAU*UP).apply_complex_function(np.exp)
+        circle.move_to(circle_plane.coords_to_point(0, 0))
+        circle_plane.circle = circle
+        circle_plane.add(circle)
+        circle_plane.fade()
+        self.circle_plane = circle_plane
+        return circle_plane
+
+    def get_time_graph(self, func, **kwargs):
+        if not hasattr(self, "time_axes"):
+            self.get_time_axes()
+        config = dict(self.default_graph_config)
+        config.update(kwargs)
+        graph = self.time_axes.get_graph(func, **config)
+        return graph
+
+    def get_cosine_wave(self, freq = 1):
+        return self.get_time_graph(lambda t : 1 + 0.5*np.cos(TAU*freq*t))
+
+    def get_polarized_mobject(self, mobject, freq = 1.0):
+        if not hasattr(self, "circle_plane"):
+            self.get_circle_plane()
+        polarized_mobject = mobject.copy()
+        polarized_mobject.apply_function(lambda p : self.polarize_point(p, freq))
+        polarized_mobject.make_smooth()
+        mobject.polarized_mobject = polarized_mobject
+        polarized_mobject.frequency = freq
+        return polarized_mobject
+
+    def polarize_point(self, point, freq = 1.0):
+        t, y = self.time_axes.point_to_coords(point)
+        z = y*np.exp(complex(0, -2*np.pi*freq*t))
+        return self.circle_plane.coords_to_point(z.real, z.imag)
+
+    def get_polarized_animation(self, mobject, freq = 1.0):
+        p_mob = self.get_polarized_mobject(mobject, freq = freq)
+        def update_p_mob(p_mob):
+            Transform(
+                p_mob, 
+                self.get_polarized_mobject(mobject, freq = freq)
+            ).update(1)
+            mobject.polarized_mobject = p_mob
+            return p_mob
+        return UpdateFromFunc(p_mob, update_p_mob)
+
+    def animate_frequency_change(self, mobjects, new_freq, **kwargs):
+        kwargs["run_time"] = kwargs.get("run_time", 3.0)
+        added_anims = kwargs.get("added_anims", [])
+        self.play(*[
+            self.get_frequency_change_animation(mob, new_freq, **kwargs)
+            for mob in mobjects
+        ] + added_anims)
+
+    def get_frequency_change_animation(self, mobject, new_freq, **kwargs):
+        if not hasattr(mobject, "polarized_mobject"):
+            mobject.polarized_mobject = self.get_polarized_mobject(mobject)
+        start_freq = mobject.polarized_mobject.frequency
+        def update(pm, alpha):
+            freq = interpolate(start_freq, new_freq, alpha)
+            new_pm = self.get_polarized_mobject(mobject, freq)
+            Transform(pm, new_pm).update(1)
+            mobject.polarized_mobject = pm
+            mobject.polarized_mobject.frequency = freq
+            return pm
+        return UpdateFromAlphaFunc(mobject.polarized_mobject, update, **kwargs)
+
+    def get_time_graph_y_vector_animation(self, graph, **kwargs):
+        config = dict(self.default_y_vector_animation_config)
+        config.update(kwargs)
+        vector = Vector(UP, color = WHITE)
+        graph_copy = graph.copy()
+        x_axis = self.time_axes.x_axis
+        x_min, x_max = x_axis.x_min, x_axis.x_max
+        def update_vector(vector, alpha):
+            x = interpolate(x_min, x_max, alpha)
+            vector.put_start_and_end_on(
+                self.time_axes.coords_to_point(x, 0),
+                self.time_axes.input_to_graph_point(x, graph_copy)
+            )
+            return vector
+        return UpdateFromAlphaFunc(vector, update_vector, **config)
+
+    def get_polarized_vector_animation(self, polarized_graph, **kwargs):
+        config = dict(self.default_y_vector_animation_config)
+        config.update(kwargs)
+        vector = Vector(RIGHT, color = WHITE)
+        origin = self.circle_plane.coords_to_point(0, 0)
+        graph_copy = polarized_graph.copy()
+        def update_vector(vector, alpha):
+            point = graph_copy.point_from_proportion(alpha)
+            vector.put_start_and_end_on(origin, point)
+            return vector
+        return UpdateFromAlphaFunc(vector, update_vector, **config)
+
+    def get_vector_animations(self, graph, draw_polarized_graph = True, **kwargs):
+        config = dict(self.default_y_vector_animation_config)
+        config.update(kwargs)
+        anims = [
+            self.get_time_graph_y_vector_animation(graph, **config),
+            self.get_polarized_vector_animation(graph.polarized_mobject, **config),
+        ]
+        if draw_polarized_graph:
+            new_config = dict(config)
+            new_config["remover"] = False
+            anims.append(ShowCreation(graph.polarized_mobject, **new_config))
+        return anims
+
+    def animate_time_sweep(self, freq, n_repeats = 1, t_max = None, **kwargs):
+        added_anims = kwargs.pop("added_anims", [])
+        config = dict(self.default_time_sweep_config)
+        config.update(kwargs)
+        circle_plane = self.circle_plane
+        time_axes = self.time_axes
+        ctp = time_axes.coords_to_point
+        t_max = t_max or time_axes.x_max
+        v_line = DashedLine(
+            ctp(0, 0), ctp(0, time_axes.y_max),
+        )
+        v_line.highlight(RED)
+
+        for x in range(n_repeats):
+            v_line.move_to(ctp(0, 0), DOWN)
+            self.play(
+                ApplyMethod(
+                    v_line.move_to, 
+                    ctp(t_max, 0), DOWN
+                ),
+                self.get_polarized_animation(v_line, freq = freq),
+                *added_anims,
+                **config
+            )
+            self.remove(v_line.polarized_mobject)
+        self.play(FadeOut(VGroup(v_line, v_line.polarized_mobject)))
+
+    def get_v_lines_indicating_periods(self, freq, n_lines = 10):
+        period = 1./freq
+        v_lines = VGroup(*[
+            DashedLine(ORIGIN, 1.5*UP).move_to(
+                self.time_axes.coords_to_point(n*period, 0),
+                DOWN
+            )
+            for n in range(1, n_lines + 1)
+        ])
+        v_lines.set_stroke(LIGHT_GREY)
+        return v_lines
+
+class WrapCosineGraphAroundCircle(FourierMachineScene):
+    CONFIG = {
+        "initial_winding_frequency" : 0.5,
+        "signal_frequency" : 3.0,
+    }
     def construct(self):
+        self.show_initial_signal()
+        self.wrap_around_circle()
+        self.show_time_sweeps()
+        self.compare_two_frequencies()
+        self.change_wrapping_frequency()
+        self.match_up_frequencies()
+
+    def show_initial_signal(self):
+        axes = self.get_time_axes()
+        graph = self.get_cosine_wave(freq = self.signal_frequency)
+        peak_points = [
+            axes.input_to_graph_point(x, graph)
+            for x in np.linspace(1, 2, 4)
+        ]
+        braces = VGroup(*[
+            Brace(Line(p1, p2), UP)
+            for p1, p2 in zip(peak_points, peak_points[1:])
+        ])
+        v_lines = VGroup(*[
+            DashedLine(
+                ORIGIN, 2*UP, color = RED
+            ).move_to(axes.coords_to_point(x, 0), DOWN)
+            for x in 1, 2
+        ])
+        words = TextMobject("3 beats/second")
+        words.scale_to_fit_width(0.9*braces.get_width())
+        words.next_to(braces, UP, SMALL_BUFF)
+
+        self.add(axes)
+        self.play(ShowCreation(graph, run_time = 2))
+        self.play(
+            FadeIn(words),
+            *map(ShowCreation, v_lines)
+        )
+        self.play(LaggedStart(FadeIn, braces))
+        self.wait()
+        self.play(FadeOut(VGroup(braces, v_lines)))
+        self.wait()
+
+        self.beats_per_second_label = words
+        self.graph = graph
+
+    def wrap_around_circle(self):
+        graph = self.graph
+        freq = self.initial_winding_frequency
+        low_freq = freq/3
+        polarized_graph = self.get_polarized_mobject(graph, low_freq)
+        circle_plane = self.get_circle_plane()
+        moving_graph = graph.copy()
+
+        self.play(ShowCreation(circle_plane))
+        self.play(ReplacementTransform(
+            moving_graph,
+            polarized_graph,
+            run_time = 3,
+            path_arc = -TAU/2
+        ))
+        self.animate_frequency_change([graph], freq)
+        self.wait()
+        self.play(*self.get_vector_animations(graph), run_time = 15)
+        self.wait()
+
+    def show_time_sweeps(self):
+        freq = self.initial_winding_frequency
+        graph = self.graph
+
+        v_lines = self.get_v_lines_indicating_periods(freq)
+        winding_freq_label = VGroup(
+            DecimalNumber(freq, num_decimal_points = 2),
+            TextMobject("cycles/second")
+        )
+        winding_freq_label.arrange_submobjects(RIGHT)
+        winding_freq_label.next_to(
+            self.circle_plane, RIGHT, aligned_edge = UP
+        )
+
+        self.animate_time_sweep(
+            freq = freq,
+            t_max = 4,
+            run_time = 6,
+            added_anims = [FadeIn(v_lines)]
+        )
+        self.play(
+            FadeIn(winding_freq_label),
+            *self.get_vector_animations(graph)
+        )
+        self.wait()
+
+        self.winding_freq_label = winding_freq_label
+        self.v_lines_indicating_periods = v_lines
+
+    def compare_two_frequencies(self):
+        bps_label = self.beats_per_second_label
+        wps_label = self.winding_freq_label
+        for label in bps_label, wps_label:
+            label.rect = SurroundingRectangle(
+                label, color = RED
+            )
+        graph = self.graph
+        freq = self.initial_winding_frequency
+
+        peak_points = [
+            self.time_axes.input_to_graph_point(x, graph)
+            for x in np.arange(0, 3.5, 1./self.signal_frequency)
+        ]
+        braces = VGroup(*[
+            Brace(Line(p1, p2), UP, buff = 0)
+            for p1, p2 in zip(peak_points, peak_points[1:])
+        ])
+
+        self.play(ShowCreation(bps_label.rect))
+        self.play(FadeOut(bps_label.rect))
+        self.play(LaggedStart(FadeIn, braces, run_time = 3))
+        self.play(FadeOut(braces))
+        self.play(ShowCreation(wps_label.rect))
+        self.play(FadeOut(wps_label.rect))
+        self.animate_time_sweep(freq = freq, t_max = 4)
+        self.wait()
+
+    def change_wrapping_frequency(self):
+        graph = self.graph
+        v_lines = self.v_lines_indicating_periods
+        freq_label = self.winding_freq_label[0]
+
+        count = 0
+        for target_freq in [2, 0.2, 1.55, self.signal_frequency]:
+            self.play(
+                Transform(
+                    v_lines, 
+                    self.get_v_lines_indicating_periods(target_freq)
+                ),
+                ChangeDecimalToValue(freq_label, target_freq),
+                self.get_frequency_change_animation(graph, target_freq),
+                run_time = 4,
+            )
+            self.wait()
+            if count == 2:
+                self.play(LaggedStart(
+                    ApplyFunction, v_lines,
+                    lambda mob : (
+                        lambda m : m.shift(0.25*UP).highlight(YELLOW), 
+                        mob
+                    ),
+                    rate_func = there_and_back
+                ))
+                self.animate_time_sweep(target_freq, t_max = 2)
+            count += 1
+        self.wait()
+        self.play(
+            *self.get_vector_animations(graph, False),
+            run_time = 15
+        )
+
+    def match_up_frequencies(self):
         pass
+
+
+
+
+
 
 
 

@@ -37,10 +37,14 @@ class NumberLine(VMobject):
         self.main_line = Line(self.x_min*RIGHT, self.x_max*RIGHT)
         self.tick_marks = VGroup()
         self.add(self.main_line, self.tick_marks)
+
         for x in self.get_tick_numbers():
-            self.add_tick(x, self.tick_size)
-        for x in self.numbers_with_elongated_ticks:
-            self.add_tick(x, self.longer_tick_multiple*self.tick_size)
+            if x in self.numbers_with_elongated_ticks:
+                tick_size_used = self.longer_tick_multiple*self.tick_size
+            else:
+                tick_size_used = self.tick_size
+            self.add_tick(x, tick_size_used)
+
         self.stretch(self.unit_size, 0)
         self.shift(-self.number_to_point(self.number_at_center))
 
@@ -175,6 +179,12 @@ class Axes(VGroup):
         y_axis_projection = self.y_axis.number_to_point(y)
         return x_axis_projection + y_axis_projection - origin
 
+    def point_to_coords(self, point):
+        return (
+            self.x_axis.point_to_number(point), 
+            self.y_axis.point_to_number(point),
+        )
+
     def get_graph(self, function, num_graph_points = 40, **kwargs):
         kwargs["fill_opacity"] = kwargs.get("fill_opacity", 0)
         graph = VMobject(**kwargs)
@@ -184,6 +194,9 @@ class Axes(VGroup):
         ])
         graph.underlying_function = function
         return graph
+
+    def input_to_graph_point(self, x, graph):
+        return self.coords_to_point(x, graph.underlying_function(x))
 
 class ThreeDAxes(Axes):
     CONFIG = {

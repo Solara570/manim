@@ -59,9 +59,13 @@ BOTTOM     = SPACE_HEIGHT*DOWN
 LEFT_SIDE  = SPACE_WIDTH*LEFT
 RIGHT_SIDE = SPACE_WIDTH*RIGHT
 
+<<<<<<< HEAD
 ###
 THIS_DIR          = os.path.dirname(os.path.realpath(__file__))
 FILE_DIR          = os.path.join(THIS_DIR, "files")
+=======
+TAU = 2*np.pi
+>>>>>>> 3b1b/master
 
 # Change this to point to where you want 
 # animation files to output
