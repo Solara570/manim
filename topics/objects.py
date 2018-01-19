@@ -449,9 +449,9 @@ class Bubble(SVGMobject):
 
     def resize_to_content(self):
         target_width = self.content.get_width()
-        target_width += max(MED_LARGE_BUFF, 2)
+        target_width += max(MED_LARGE_BUFF, 1.5)
         target_height = self.content.get_height()
-        target_height += 2.5*LARGE_BUFF
+        target_height += 2*LARGE_BUFF
         tip_point = self.get_tip()
         self.stretch_to_fit_width(target_width)
         self.stretch_to_fit_height(target_height)
