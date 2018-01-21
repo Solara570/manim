@@ -4,6 +4,7 @@ from mobject import Mobject1D
 from mobject.vectorized_mobject import VMobject, VGroup
 from mobject.tex_mobject import TexMobject
 from topics.geometry import Line, Arrow
+from topics.functions import ParametricFunction
 from scene import Scene
 
 class NumberLine(VMobject):
@@ -14,7 +15,7 @@ class NumberLine(VMobject):
         "unit_size" : 1,
         "tick_size" : 0.1,
         "tick_frequency" : 1,
-        "leftmost_tick" : None, #Defaults to ceil(x_min)
+        "leftmost_tick" : None, #Defaults to value near x_min s.t. 0 is a tick
         "numbers_with_elongated_ticks" : [0],
         "numbers_to_show" : None,
         "longer_tick_multiple" : 2,
@@ -28,7 +29,8 @@ class NumberLine(VMobject):
     def __init__(self, **kwargs):
         digest_config(self, kwargs)
         if self.leftmost_tick is None:
-            self.leftmost_tick = np.ceil(self.x_min)
+            tf = self.tick_frequency
+            self.leftmost_tick = tf*np.ceil(self.x_min/tf)
         VMobject.__init__(self, **kwargs)
         if self.include_tip:
             self.add_tip()
@@ -37,9 +39,15 @@ class NumberLine(VMobject):
         self.main_line = Line(self.x_min*RIGHT, self.x_max*RIGHT)
         self.tick_marks = VGroup()
         self.add(self.main_line, self.tick_marks)
+        rounding_value = int(-np.log10(0.1*self.tick_frequency))
+        rounded_numbers_with_elongated_ticks = np.round(
+            self.numbers_with_elongated_ticks, 
+            rounding_value
+        )
 
         for x in self.get_tick_numbers():
-            if x in self.numbers_with_elongated_ticks:
+            rounded_x = np.round(x, rounding_value)
+            if rounded_x in rounded_numbers_with_elongated_ticks:
                 tick_size_used = self.longer_tick_multiple*self.tick_size
             else:
                 tick_size_used = self.tick_size
@@ -155,17 +163,21 @@ class Axes(VGroup):
         "z_min" : -3.5,
         "z_max" : 3.5,
         "z_normal" : DOWN,
+        "default_num_graph_points" : 100,
     }
     def __init__(self, **kwargs):
         VGroup.__init__(self, **kwargs)
         self.x_axis = self.get_axis(self.x_min, self.x_max, self.x_axis_config)
         self.y_axis = self.get_axis(self.y_min, self.y_max, self.y_axis_config)
-        self.y_axis.rotate(np.pi/2)
+        self.y_axis.rotate(np.pi/2, about_point = ORIGIN)
         self.add(self.x_axis, self.y_axis)
         if self.three_d:
             self.z_axis = self.get_axis(self.z_min, self.z_max, self.z_axis_config)
-            self.z_axis.rotate(-np.pi/2, UP)
-            self.z_axis.rotate(angle_of_vector(self.z_normal), OUT)
+            self.z_axis.rotate(-np.pi/2, UP, about_point = ORIGIN)
+            self.z_axis.rotate(
+                angle_of_vector(self.z_normal), OUT,
+                about_point = ORIGIN
+            )
             self.add(self.z_axis)
 
     def get_axis(self, min_val, max_val, extra_config):
@@ -185,13 +197,16 @@ class Axes(VGroup):
             self.y_axis.point_to_number(point),
         )
 
-    def get_graph(self, function, num_graph_points = 40, **kwargs):
+    def get_graph(self, function, num_graph_points = None, **kwargs):
         kwargs["fill_opacity"] = kwargs.get("fill_opacity", 0)
-        graph = VMobject(**kwargs)
-        graph.set_points_smoothly([
-            self.coords_to_point(x, function(x))
-            for x in np.linspace(self.x_min, self.x_max, num_graph_points)
-        ])
+        kwargs["num_anchor_points"] = \
+            num_graph_points or self.default_num_graph_points
+        graph = ParametricFunction(
+            lambda t : self.coords_to_point(t, function(t)),
+            t_min = self.x_min,
+            t_max = self.x_max,
+            **kwargs
+        )
         graph.underlying_function = function
         return graph
 
@@ -223,6 +238,7 @@ class NumberPlane(VMobject):
         "secondary_line_ratio" : 1,
         "written_coordinate_height" : 0.2,
         "propagate_style_to_family" : False,
+        "make_smooth_after_applying_functions" : True,
     }
     def generate_points(self):
         if self.x_radius is None:
@@ -359,9 +375,6 @@ class NumberPlane(VMobject):
                 mob.insert_n_anchor_points(num_inserted_anchor_points-num_anchors)
                 mob.make_smooth()
         return self
-
-    def apply_function(self, function, maintain_smoothness = True):
-        VMobject.apply_function(self, function, maintain_smoothness = maintain_smoothness)
 
 
 

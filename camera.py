@@ -84,15 +84,38 @@ class Camera(object):
     def reset(self):
         self.set_pixel_array(np.array(self.background))
 
+    ####
+
+    def extract_mobject_family_members(self, mobjects, only_those_with_points = False):
+        if only_those_with_points:
+            method = Mobject.family_members_with_points
+        else:
+            method = Mobject.submobject_family
+        return remove_list_redundancies(list(
+            it.chain(*[
+                method(m)
+                for m in mobjects
+                if not (isinstance(m, VMobject) and m.is_subpath)
+            ])
+        ))
+
     def capture_mobject(self, mobject):
         return self.capture_mobjects([mobject])
 
-    def capture_mobjects(self, mobjects, include_submobjects = True):
+    def capture_mobjects(
+        self, mobjects, 
+        include_submobjects = True,
+        excluded_mobjects = None,
+        ):
         if include_submobjects:
-            mobjects = it.chain(*[
-                mob.family_members_with_points() 
-                for mob in mobjects
-            ])
+            mobjects = self.extract_mobject_family_members(
+                mobjects, only_those_with_points = True
+            )
+            if excluded_mobjects:
+                all_excluded = self.extract_mobject_family_members(
+                    excluded_mobjects
+                )
+                mobjects = list_difference_update(mobjects, all_excluded)
         vmobjects = []
         for mobject in mobjects:
             if isinstance(mobject, VMobject):
@@ -193,12 +216,12 @@ class Camera(object):
         pixel_coords = self.thickened_coordinates(
             pixel_coords, thickness
         )
-        rgb_len = self.pixel_array.shape[2]
+        rgba_len = self.pixel_array.shape[2]
 
         rgbas = (255*rgbas).astype('uint8')
         target_len = len(pixel_coords)
         factor = target_len/len(rgbas)
-        rgbas = np.array([rgbas]*factor).reshape((target_len, rgb_len))
+        rgbas = np.array([rgbas]*factor).reshape((target_len, rgba_len))
 
         on_screen_indices = self.on_screen_pixels(pixel_coords)        
         pixel_coords = pixel_coords[on_screen_indices]        
@@ -211,9 +234,9 @@ class Camera(object):
         indices = np.dot(pixel_coords, flattener)[:,0]
         indices = indices.astype('int')
         
-        new_pa = self.pixel_array.reshape((ph*pw, rgb_len))
+        new_pa = self.pixel_array.reshape((ph*pw, rgba_len))
         new_pa[indices] = rgbas
-        self.pixel_array = new_pa.reshape((ph, pw, rgb_len))
+        self.pixel_array = new_pa.reshape((ph, pw, rgba_len))
 
     def display_image_mobject(self, image_mobject):
         corner_coords = self.points_to_pixel_coords(image_mobject.points)
@@ -344,10 +367,7 @@ class Camera(object):
 
     def get_thickening_nudges(self, thickness):
         _range = range(-thickness/2+1, thickness/2+1)
-        return np.array(
-            list(it.product([0], _range))+
-            list(it.product(_range, [0]))
-        )
+        return np.array(list(it.product(_range, _range)))
 
     def thickened_coordinates(self, pixel_coords, thickness):
         nudges = self.get_thickening_nudges(thickness)

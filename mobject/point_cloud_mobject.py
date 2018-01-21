@@ -37,7 +37,14 @@ class PMobject(Mobject):
             mob.rgbas[:,:] = rgba
         return self
 
-    def gradient_highlight(self, start_color, end_color):
+    # def gradient_highlight(self, start_color, end_color):
+    def gradient_highlight(self, *colors):
+        self.rgbas = np.array(map(
+            color_to_rgba, 
+            color_gradient(colors, len(self.points))
+        ))
+        return self
+
         start_rgba, end_rgba = map(color_to_rgba, [start_color, end_color])
         for mob in self.family_members_with_points():
             num_points = mob.get_num_points()
@@ -45,6 +52,19 @@ class PMobject(Mobject):
                 interpolate(start_rgba, end_rgba, alpha)
                 for alpha in np.arange(num_points)/float(num_points)
             ])
+        return self
+
+    def radial_gradient_highlight(self, center = None, radius = 1, inner_color = WHITE, outer_color = BLACK):
+        start_rgba, end_rgba = map(color_to_rgba, [start_color, end_color])
+        if center == None:
+            center = self.get_center()
+        for mob in self.family_members_with_points():
+            num_points = mob.get_num_points()
+            t = min(1,np.abs(mob.get_center() - center)/radius)
+
+            mob.rgbas = np.array(
+                [ interpolate(start_rgba, end_rgba, t) ] * num_points
+                )
         return self
 
     def match_colors(self, mobject):
@@ -147,7 +167,6 @@ class Mobject1D(PMobject):
         self.epsilon = 1.0 / self.density        
         Mobject.__init__(self, **kwargs)
 
-
     def add_line(self, start, end, color = None):
         start, end = map(np.array, [start, end])
         length = np.linalg.norm(end - start)
@@ -171,6 +190,23 @@ class Mobject2D(PMobject):
         Mobject.__init__(self, **kwargs)
 
 
+class PointCloudDot(Mobject1D):
+    CONFIG = {
+        "radius" : 0.075,
+        "stroke_width" : 2,
+        "density" : DEFAULT_POINT_DENSITY_1D,
+        "color" : YELLOW,
+    }
+    def __init__(self, center = ORIGIN, **kwargs):
+        Mobject1D.__init__(self, **kwargs)
+        self.shift(center)
+
+    def generate_points(self):
+        self.add_points([
+            r*(np.cos(theta)*RIGHT + np.sin(theta)*UP)
+            for r in np.arange(0, self.radius, self.epsilon)
+            for theta in np.arange(0, 2*np.pi, self.epsilon/r)
+        ])
 
 class Point(PMobject):
     CONFIG = {

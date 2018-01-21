@@ -9,20 +9,28 @@ from helpers import *
 class DecimalNumber(VMobject):
     CONFIG = {
         "num_decimal_points" : 2,
-        "digit_to_digit_buff" : 0.05
+        "digit_to_digit_buff" : 0.05,
+        "show_ellipsis" : False
     }
     def __init__(self, number, **kwargs):
         digest_config(self, kwargs, locals())
         num_string = '%.*f'%(self.num_decimal_points, number)
+        negative_zero_string = "-%.*f"%(self.num_decimal_points, 0.)
+        if num_string == negative_zero_string:
+            num_string = num_string[1:]
         VMobject.__init__(self, *[
             TexMobject(char)
             for char in num_string
         ], **kwargs)
+
+        if self.show_ellipsis:
+            self.add(TexMobject("\\dots"))
+    
         self.arrange_submobjects(
             buff = self.digit_to_digit_buff,
             aligned_edge = DOWN
         )
-        if number < 0:
+        if num_string.startswith("-"):
             minus = self.submobjects[0]
             minus.next_to(
                 self.submobjects[1], LEFT,
@@ -46,6 +54,7 @@ class Integer(VGroup):
 class ChangingDecimal(Animation):
     CONFIG = {
         "num_decimal_points" : None,
+        "show_ellipsis" : None,
         "spare_parts" : 2,
         "position_update_func" : None,
         "tracked_mobject" : None
@@ -54,13 +63,16 @@ class ChangingDecimal(Animation):
         digest_config(self, kwargs, locals())
         if self.num_decimal_points is None:
             self.num_decimal_points = decimal_number_mobject.num_decimal_points
+        if self.show_ellipsis is None:
+            self.show_ellipsis = decimal_number_mobject.show_ellipsis
         decimal_number_mobject.add(*[
             VectorizedPoint(decimal_number_mobject.get_corner(DOWN+LEFT))
             for x in range(self.spare_parts)]
         )
         if self.tracked_mobject:
-            self.diff_from_tracked_mobject = \
-                decimal_number_mobject.get_center() - self.tracked_mobject.get_center()
+            dmc = decimal_number_mobject.get_center()
+            tmc = self.tracked_mobject.get_center()
+            self.diff_from_tracked_mobject = dmc - tmc
         Animation.__init__(self, decimal_number_mobject, **kwargs)
 
     def update_mobject(self, alpha):
@@ -71,18 +83,15 @@ class ChangingDecimal(Animation):
         decimal = self.decimal_number_mobject
         new_number = self.number_update_func(alpha)
         new_decimal = DecimalNumber(
-            new_number, num_decimal_points = self.num_decimal_points
+            new_number, 
+            num_decimal_points = self.num_decimal_points,
+            show_ellipsis = self.show_ellipsis
         )
         new_decimal.replace(decimal, dim_to_match = 1)
         new_decimal.highlight(decimal.get_color())
-        decimal.align_data(new_decimal)
-        families = [
-            mob.family_members_with_points()
-            for mob in decimal, new_decimal
-        ]
-        for sm1, sm2 in zip(*families):
-            sm1.interpolate(sm1, sm2, 1)
-        self.mobject.number = new_number
+
+        decimal.submobjects = new_decimal.submobjects
+        decimal.number = new_number
 
     def update_position(self):
         if self.position_update_func is not None:

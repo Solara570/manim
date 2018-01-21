@@ -11,29 +11,39 @@ class Arc(VMobject):
         "anchors_span_full_range" : True,
     }
     def __init__(self, angle, **kwargs):
-        digest_locals(self)
+        self.angle = angle
         VMobject.__init__(self, **kwargs)
 
     def generate_points(self):
-        self.set_anchor_points(
-            self.get_unscaled_anchor_points(),
-            mode = "smooth"
-        )
-        self.scale(self.radius)
-
-    def get_unscaled_anchor_points(self):
-        return [
+        anchors = np.array([
             np.cos(a)*RIGHT+np.sin(a)*UP
             for a in np.linspace(
                 self.start_angle, 
                 self.start_angle + self.angle, 
                 self.num_anchors
             )
-        ]
+        ])
+        #Figure out which control points will give the
+        #Appropriate tangent lines to the circle
+        d_theta = self.angle/(self.num_anchors-1.0)
+        tangent_vectors = np.zeros(anchors.shape)
+        tangent_vectors[:,1] = anchors[:,0]
+        tangent_vectors[:,0] = -anchors[:,1]
+        handles1 = anchors[:-1] + (d_theta/3)*tangent_vectors[:-1]
+        handles2 = anchors[1:] - (d_theta/3)*tangent_vectors[1:]
+        self.set_anchors_and_handles(
+            anchors, handles1, handles2
+        )
+        self.scale(self.radius, about_point = ORIGIN)
 
     def add_tip(self, tip_length = 0.25):
         #TODO, do this a better way
-        arrow = Arrow(*self.points[-2:], tip_length = tip_length)
+        p1, p2 = self.points[-2:]
+        arrow = Arrow(
+            p1, 2*p2 - p1, 
+            tip_length = tip_length,
+            max_tip_length_to_length_ratio = 2.0
+        )
         self.add(arrow.split()[-1])
         self.highlight(self.get_color())
         return self
@@ -66,10 +76,101 @@ class Dot(Circle):
         self.shift(point)
         self.init_colors()
 
+
+
+class AnnularSector(VMobject):
+    CONFIG = {
+        "inner_radius" : 1,
+        "outer_radius" : 2,
+        "angle" : TAU/4,
+        "start_angle" : 0,
+        "fill_opacity" : 1,
+        "stroke_width" : 0,
+        "color" : WHITE,
+        "mark_paths_closed" : True,
+    }
+    def generate_points(self):
+        arc1 = Arc(
+            angle = self.angle,
+            start_angle = self.start_angle,
+            radius = self.inner_radius,
+        )
+        arc2 = Arc(
+            angle = -1*self.angle,
+            start_angle = self.start_angle+self.angle,
+            radius = self.outer_radius,
+        )
+        a1_to_a2_points = np.array([
+            interpolate(arc1.points[-1], arc2.points[0], alpha)
+            for alpha in np.linspace(0, 1, 4)
+        ])
+        a2_to_a1_points = np.array([
+            interpolate(arc2.points[-1], arc1.points[0], alpha)
+            for alpha in np.linspace(0, 1, 4)
+        ])
+        self.points = np.array(arc1.points)
+        self.add_control_points(a1_to_a2_points[1:])
+        self.add_control_points(arc2.points[1:])
+        self.add_control_points(a2_to_a1_points[1:])
+
+
+    def get_arc_center(self):
+        first_point = self.points[0]
+        last_point = self.points[-2]
+        v = last_point - first_point
+        radial_unit_vector = v/np.linalg.norm(v)
+        arc_center = first_point - self.inner_radius * radial_unit_vector
+
+
+
+        # radial_unit_vector = np.array([np.cos(self.start_angle),
+        #         np.sin(self.start_angle), 0])
+        # arc_center = inner_arc_start_point - inner_arc.radius * radial_unit_vector
+        return arc_center
+
+
+
+
+
+class Sector(AnnularSector):
+
+    CONFIG = {
+        "outer_radius" : 1,
+        "inner_radius" : 0
+    }
+
+    @property
+    def radius(self):
+        return self.outer_radius
+
+    @radius.setter
+    def radius(self,new_radius):
+        self.outer_radius = new_radius
+
+
+
+class Annulus(Circle):
+    CONFIG = {
+        "inner_radius": 1,
+        "outer_radius": 2,
+        "fill_opacity" : 1,
+        "stroke_width" : 0,
+        "color" : WHITE,
+        "mark_paths_closed" : False,
+        "propagate_style_to_family" : True
+    }
+
+    def generate_points(self):
+        self.radius = self.outer_radius
+        Circle.generate_points(self)
+        inner_circle = Circle(radius=self.inner_radius)
+        inner_circle.flip()
+        self.add_subpath(inner_circle.points)
+
+
 class Line(VMobject):
     CONFIG = {
         "buff" : 0,
-        "considered_smooth" : False,
         "path_arc" : None,
         "n_arc_anchors" : 10, #Only used if path_arc is not None
     }
@@ -87,7 +188,6 @@ class Line(VMobject):
                 path_func(self.start, self.end, alpha)
                 for alpha in np.linspace(0, 1, self.n_arc_anchors)
             ])
-            self.considered_smooth = True
         self.account_for_buff()
 
     def account_for_buff(self):
@@ -404,7 +504,6 @@ class Polygon(VMobject):
         "color" : GREEN_D,
         "mark_paths_closed" : True,
         "close_new_points" : True,
-        "considered_smooth" : False,
     }
     def __init__(self, *vertices, **kwargs):
         assert len(vertices) > 1
@@ -434,7 +533,6 @@ class Rectangle(VMobject):
         "width"  : 4.0,
         "mark_paths_closed" : True,
         "close_new_points" : True,
-        "considered_smooth" : False,
     }
     def generate_points(self):
         y, x = self.height/2., self.width/2.
@@ -541,7 +639,6 @@ class Grid(VMobject):
     CONFIG = {
         "height" : 6.0,
         "width"  : 6.0,
-        "considered_smooth" : False,
     }
     def __init__(self, rows, columns, **kwargs):
         digest_config(self, kwargs, locals())
