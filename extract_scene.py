@@ -60,7 +60,7 @@ def get_configuration():
          ("-l", "--low_quality"),
          ("-m", "--medium_quality"),
          ("-g", "--save_pngs"),
-         ("-f", "--show_file_in_finder"),
+         # ("-f", "--show_file_in_finder"),
          ("-t", "--transparent"),
          ("-q", "--quiet"),
          ("-a", "--write_all")
@@ -77,7 +77,7 @@ def get_configuration():
       "file"            : args.file,
       "scene_name"      : args.scene_name,
       "open_video_upon_completion" : args.preview,
-      "show_file_in_finder" : args.show_file_in_finder,
+      # "show_file_in_finder" : args.show_file_in_finder,
       #By default, write to file
       "write_to_movie"  : args.write_to_movie or not args.show_last_frame,
       "show_last_frame" : args.show_last_frame,
@@ -119,18 +119,20 @@ def handle_scene(scene, **config):
    open_file = any([
       config["show_last_frame"],
       config["open_video_upon_completion"],
-      config["show_file_in_finder"]
+      config["write_to_movie"]
+      # config["show_file_in_finder"]
    ])
    if open_file:
-      commands = ["open"]
-      if config["show_file_in_finder"]:
-         commands.append("-R")
+      # commands = ["open"]
+      # if config["show_file_in_finder"]:
+      #    commands.append("-R")
       #
+      commands = []
       if config["show_last_frame"]:
          commands.append(scene.get_image_file_path())
       else:
          commands.append(scene.get_movie_file_path())
-      sp.call(commands)
+      sp.call(commands, shell = True)
 
    if config["quiet"]:
       sys.stdout.close()
