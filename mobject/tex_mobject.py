@@ -89,7 +89,7 @@ class TexMobject(SVGMobject):
             should_replace = reduce(op.and_, [
                 t1 in tex,
                 t2 not in tex,
-                len(tex) > len(t1) and tex[len(t1)] in "()[]|\\"
+                len(tex) > len(t1) and tex[len(t1)] in "()[]<>|.\\"
             ])
             if should_replace:
                 tex = tex.replace(t1, "\\big")
@@ -168,9 +168,14 @@ class TexMobject(SVGMobject):
             part.highlight(color)
         return self
 
-    def highlight_by_tex_to_color_map(self, tex_to_color_map):
-        for tex, color in tex_to_color_map.items():
-            self.highlight_by_tex(tex, color)
+    def highlight_by_tex_to_color_map(self, texs_to_color_map, **kwargs):
+        for texs, color in texs_to_color_map.items():
+            try:
+                texs + ''
+                self.highlight_by_tex(texs, color, **kwargs)
+            except TypeError:
+                for tex in texs:
+                    self.highlight_by_tex(tex, color, **kwargs)
         return self
 
     def index_of_part(self, part):
