@@ -171,9 +171,11 @@ class TexMobject(SVGMobject):
     def highlight_by_tex_to_color_map(self, texs_to_color_map, **kwargs):
         for texs, color in texs_to_color_map.items():
             try:
+                # If the given key behaves like strings
                 texs + ''
                 self.highlight_by_tex(texs, color, **kwargs)
             except TypeError:
+                # If the given key is a tuple
                 for tex in texs:
                     self.highlight_by_tex(tex, color, **kwargs)
         return self

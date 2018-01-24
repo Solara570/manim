@@ -10,6 +10,8 @@ from mobject.vectorized_mobject import *
 from animation.animation import Animation
 from animation.transform import *
 from animation.simple_animations import *
+from animation.continual_animation import *
+
 from animation.playground import *
 from topics.geometry import *
 from topics.characters import *
@@ -35,16 +37,109 @@ inverse_quadratic = lambda maxint,cutoff: inverse_power_law(maxint,cutoff,2)
 LIGHT_COLOR = YELLOW
 INDICATOR_RADIUS = 0.7
 INDICATOR_STROKE_WIDTH = 1
-INDICATOR_STROKE_COLOR = LIGHT_COLOR
-INDICATOR_TEXT_COLOR = LIGHT_COLOR
+INDICATOR_STROKE_COLOR = WHITE
+INDICATOR_TEXT_COLOR = WHITE
+INDICATOR_UPDATE_TIME = 0.2
+FAST_INDICATOR_UPDATE_TIME = 0.1
 OPACITY_FOR_UNIT_INTENSITY = 0.2
+SWITCH_ON_RUN_TIME = 2.5
+FAST_SWITCH_ON_RUN_TIME = 0.1
+LIGHT_CONE_NUM_SECTORS = 30
+NUM_CONES = 50 # in first lighthouse scene
+NUM_VISIBLE_CONES = 5 # ibidem
+ARC_TIP_LENGTH = 0.2
 
+
+def show_line_length(line):
+    v = line.points[1] - line.points[0]
+    print v[0]**2 + v[1]**2
+
+
+class AngleUpdater(ContinualAnimation):
+    def __init__(self, angle_arc, lc, **kwargs):
+        self.angle_arc = angle_arc
+        self.source_point = angle_arc.get_arc_center()
+        self.lc = lc
+        #self.angle_decimal = angle_decimal
+        ContinualAnimation.__init__(self, self.angle_arc, **kwargs)
+
+    def update_mobject(self, dt):
+    # angle arc
+        new_arc = self.angle_arc.copy().set_bound_angles(
+            start = self.lc.start_angle,
+            stop = self.lc.stop_angle()
+         )
+        new_arc.generate_points()
+        new_arc.move_arc_center_to(self.source_point)
+        self.angle_arc.points = new_arc.points
+        self.angle_arc.add_tip(tip_length = ARC_TIP_LENGTH, at_start = True, at_end = True)
+
+
+
+
+class LightScreen(VMobject):
+    # A light screen is composed of a VMobject and a light cone.
+    # It has knowledge of the light source point.
+    # As the screen changes, it calculates the viewing angle from
+    # the source and updates the light cone.
+
+    def __init__(self, light_source = ORIGIN, screen = None, light_cone = None):
+        Mobject.__init__(self)
+        self.light_cone = light_cone
+        self.light_source = light_source
+        self.screen = screen
+        self.light_cone.move_source_to(self.light_source)
+        self.shadow = VMobject(fill_color = BLACK, stroke_width = 0, fill_opacity = 1.0)
+        self.add(self.light_cone, self.screen, self.shadow)
+        self.update_shadow(self.shadow)
+
+    def update_light_cone(self,lc):
+        lower_angle, upper_angle = self.viewing_angles()
+        self.light_cone.update_opening(start_angle = lower_angle,
+            stop_angle = upper_angle)
+        return self
+
+    def viewing_angle_of_point(self,point):
+        distance_vector = point - self.light_source
+        angle = angle_of_vector(distance_vector)
+        return angle
+
+    def viewing_angles(self):
+        all_points = []
+
+        for submob in self.family_members_with_points():
+            all_points.extend(submob.get_anchors())
+
+        viewing_angles = np.array(map(self.viewing_angle_of_point, self.screen.get_anchors()))
+           
+        if len(viewing_angles) == 0:
+            lower_angle = upper_angle = 0
+        else:
+            lower_angle = np.min(viewing_angles)
+            upper_angle = np.max(viewing_angles)
+
+        return lower_angle, upper_angle
+
+    def update_shadow(self,sh):
+        self.shadow.points = self.screen.points
+        ray1 = self.screen.points[0] - self.light_source
+        ray2 = self.screen.points[-1] - self.light_source
+        ray1 = ray1/np.linalg.norm(ray1) * 100
+        ray1 = rotate_vector(ray1,-TAU/16)
+        ray2 = ray2/np.linalg.norm(ray2) * 100
+        ray2 = rotate_vector(ray2,TAU/16)
+        outpoint1 = self.screen.points[0] + ray1
+        outpoint2 = self.screen.points[-1] + ray2
+        self.shadow.add_control_points([outpoint2,outpoint1,self.screen.points[0]])
+        self.shadow.mark_paths_closed = True
 
 
 class LightCone(VGroup):
     CONFIG = {
+        "start_angle": 0,
         "angle" : TAU/8,
-        "radius" : 5,
+        "radius" : 10,
+        "brightness" : 1,
         "opacity_function" : lambda r : 1./max(r, 0.01),
         "num_sectors" : 10,
         "color": LIGHT_COLOR,
@@ -54,29 +149,69 @@ class LightCone(VGroup):
         radii = np.linspace(0, self.radius, self.num_sectors+1)
         sectors = [
             AnnularSector(
+                start_angle = self.start_angle,
                 angle = self.angle,
                 inner_radius = r1,
                 outer_radius = r2,
                 stroke_width = 0,
                 stroke_color = self.color,
                 fill_color = self.color,
-                fill_opacity = self.opacity_function(r1),
+                fill_opacity = self.brightness * self.opacity_function(r1),
             )
             for r1, r2 in zip(radii, radii[1:])
         ]
         self.add(*sectors)
 
+    def get_source_point(self):
+        if len(self.submobjects) == 0:
+            return None
+        source = self.submobjects[0].get_arc_center()
+        return source
+
+    def move_source_to(self,point):
+        if len(self.submobjects) == 0:
+            return
+        source = self.submobjects[0].get_arc_center()
+        self.shift(point - source)
+        
+    def update_opening(self, start_angle, stop_angle):
+        self.start_angle = start_angle
+        self.angle = stop_angle - start_angle
+        source_point = self.get_source_point()
+        for submob in self.submobjects:
+            if type(submob) == AnnularSector:
+
+                submob.start_angle = self.start_angle
+                submob.angle = self.angle
+                submob.generate_points()
+                submob.shift(source_point - submob.get_arc_center())
+
+    def set_brightness(self,new_brightness):
+        self.brightness = new_brightness
+        radii = np.linspace(0, self.radius, self.num_sectors+1)
+        for (r1,sector) in zip(radii,self.submobjects):
+            sector.set_fill(opacity =  self.brightness * self.opacity_function(r1))
+
+    def stop_angle(self):
+        return self.start_angle + self.angle
+
+
+
+
+
+
 
 class Candle(VGroup):
     CONFIG = {
         "radius" : 5,
+        "brightness" : 1.0,
         "opacity_function" : lambda r : 1./max(r, 0.01),
-        "num_sectors" : 10,
+        "num_annuli" : 10,
         "color": LIGHT_COLOR,
     }
 
     def generate_points(self):
-        radii = np.linspace(0, self.radius, self.num_sectors+1)
+        radii = np.linspace(0, self.radius, self.num_annuli+1)
         annuli = [
             Annulus(
                 inner_radius = r1,
@@ -84,18 +219,37 @@ class Candle(VGroup):
                 stroke_width = 0,
                 stroke_color = self.color,
                 fill_color = self.color,
-                fill_opacity = self.opacity_function(r1),
+                fill_opacity = self.brightness * self.opacity_function(r1),
             )
             for r1, r2 in zip(radii, radii[1:])
         ]
         self.add(*annuli)
+
+    def get_source_point(self):
+        if len(self.submobjects) == 0:
+            return None
+        source = self.submobjects[0].get_center()
+        return source
+
+    def move_source_to(self,point):
+        if len(self.submobjects) == 0:
+            return
+        source = self.submobjects[0].get_center()
+        self.shift(point - source)
+
+    def set_brightness(self,new_brightness):
+        self.brightness = new_brightness
+        radii = np.linspace(0, self.radius, self.num_annuli+1)
+        for (r1,annulus) in zip(radii,self.submobjects):
+            annulus.set_fill(opacity =  self.brightness * self.opacity_function(r1))
+
 
 
 
 class SwitchOn(LaggedStart):
     CONFIG = {
         "lag_ratio": 0.2,
-        "run_time": 3
+        "run_time": SWITCH_ON_RUN_TIME
     }
 
     def __init__(self, light, **kwargs):
@@ -113,7 +267,7 @@ class LightHouse(SVGMobject):
 class LightIndicator(Mobject):
     CONFIG = {
         "radius": 0.5,
-        "intensity": 1,
+        "intensity": 0,
         "opacity_for_unit_intensity": 1
     }
 
@@ -124,7 +278,7 @@ class LightIndicator(Mobject):
         self.foreground.set_stroke(color=INDICATOR_STROKE_COLOR,width=INDICATOR_STROKE_WIDTH)
 
         self.add(self.background, self.foreground)
-        self.reading = DecimalNumber(self.intensity)
+        self.reading = DecimalNumber(self.intensity,num_decimal_points = 3)
         self.reading.set_fill(color=INDICATOR_TEXT_COLOR)
         self.reading.move_to(self.get_center())
         self.add(self.reading)
@@ -162,8 +316,8 @@ class IntroScene(PiCreatureScene):
 
     def construct(self):
 
-        morty = self.get_primary_pi_creature()
-        morty.scale(0.7).to_corner(DOWN+RIGHT)
+        randy = self.get_primary_pi_creature()
+        randy.scale(0.7).to_corner(DOWN+RIGHT)
 
         self.force_skipping()
 
@@ -216,7 +370,6 @@ class IntroScene(PiCreatureScene):
             FadeIn(self.partial_sum_decimal, run_time = self.duration)
 
             if i == 0:
-
 
                 self.play(
                     FadeIn(self.euler_sum[1], run_time = self.duration),
@@ -386,9 +539,10 @@ class IntroScene(PiCreatureScene):
 
 
 
-class FirstLightHouseScene(Scene):
+class FirstLightHouseScene(PiCreatureScene):
 
     def construct(self):
+        self.remove(self.get_primary_pi_creature())
         self.show_lighthouses_on_number_line()
 
 
@@ -398,41 +552,77 @@ class FirstLightHouseScene(Scene):
         self.number_line = NumberLine(
             x_min = 0,
             color = WHITE,
-            number_at_center = 1,
+            number_at_center = 1.6,
             stroke_width = 1,
-            numbers_with_elongated_ticks = [0,1,2,3],
-            numbers_to_show = np.arange(0,5),
+            numbers_with_elongated_ticks = range(1,5),
+            numbers_to_show = range(1,5),
             unit_size = 2,
             tick_frequency = 0.2,
-            line_to_number_buff = LARGE_BUFF
+            line_to_number_buff = LARGE_BUFF,
+            label_direction = UP,
         )
+
+        self.number_line.label_direction = DOWN
 
         self.number_line_labels = self.number_line.get_number_mobjects()
         self.add(self.number_line,self.number_line_labels)
         self.wait()
 
-        light_indicator = LightIndicator(radius = INDICATOR_RADIUS,
-            opacity_for_unit_intensity = OPACITY_FOR_UNIT_INTENSITY, color = LIGHT_COLOR)
-
         origin_point = self.number_line.number_to_point(0)
-        light_indicator.move_to(origin_point)
-        self.add_foreground_mobject(light_indicator)
+
+        self.default_pi_creature_class = Randolph
+        randy = self.get_primary_pi_creature()
+
+        randy.scale(0.5)
+        randy.flip()
+        right_pupil = randy.pupils[1]
+        randy.next_to(origin_point, LEFT, buff = 0, submobject_to_align = right_pupil)
+
+
+
+        light_indicator = LightIndicator(radius = INDICATOR_RADIUS,
+            opacity_for_unit_intensity = OPACITY_FOR_UNIT_INTENSITY,
+            color = LIGHT_COLOR)
+        light_indicator.reading.scale(0.8)
+
+        bubble = ThoughtBubble(direction = RIGHT,
+                            width = 2.5, height = 3.5)
+        bubble.next_to(randy,LEFT+UP)
+        bubble.add_content(light_indicator)
+
+        self.play(
+            randy.change, "wave_2",
+            ShowCreation(bubble),
+            FadeIn(light_indicator)
+        )
 
         lighthouses = []
         lighthouse_pos = []
         light_cones = []
 
-        num_cones = 2
 
-        for i in range(1,num_cones+1):
+        euler_sum_above = TexMobject("1", "+", "{1\over 4}", 
+            "+", "{1\over 9}", "+", "{1\over 16}", "+", "{1\over 25}", "+", "{1\over 36}")
+
+        for (i,term) in zip(range(len(euler_sum_above)),euler_sum_above):
+            #horizontal alignment with tick marks
+            term.next_to(self.number_line.number_to_point(0.5*i+1),UP,buff = 2)
+            # vertical alignment with light indicator
+            old_y = term.get_center()[1]
+            new_y = light_indicator.get_center()[1]
+            term.shift([0,new_y - old_y,0])
+            
+
+
+        for i in range(1,NUM_CONES+1):
             lighthouse = LightHouse()
             point = self.number_line.number_to_point(i)
-            light_cone = LightCone(angle = TAU/8,
-            #light_cone = Candle(
-                opacity_function = inverse_power_law(1,1,2),
-                num_sectors = 10,
-                radius = 10)
-            light_cone.move_to(point)
+            light_cone = Candle(
+                opacity_function = inverse_quadratic(1,1),
+                num_annuli = LIGHT_CONE_NUM_SECTORS,
+                radius = 12)
+            
+            light_cone.move_source_to(point)
             lighthouse.next_to(point,DOWN,0)
             lighthouses.append(lighthouse)
             light_cones.append(light_cone)
@@ -444,27 +634,219 @@ class FirstLightHouseScene(Scene):
 
         light_indicator.set_intensity(0)
 
-        intensities = np.cumsum(np.array([1./n**2 for n in range(1,num_cones+1)]))
+        intensities = np.cumsum(np.array([1./n**2 for n in range(1,NUM_CONES+1)]))
         opacities = intensities * light_indicator.opacity_for_unit_intensity
 
         self.remove_foreground_mobjects(light_indicator)
 
 
-        for (i,lc) in zip(range(num_cones),light_cones):
+        # slowly switch on visible light cones and increment indicator
+        for (i,lc) in zip(range(NUM_VISIBLE_CONES),light_cones[:NUM_VISIBLE_CONES]):
+            indicator_start_time = 0.4 * (i+1) * SWITCH_ON_RUN_TIME/lc.radius * self.number_line.unit_size
+            indicator_stop_time = indicator_start_time + INDICATOR_UPDATE_TIME
+            indicator_rate_func = squish_rate_func(
+                smooth,indicator_start_time,indicator_stop_time)
             self.play(
                 SwitchOn(lc),
-                #Animation(light_indicator),
-                ChangeDecimalToValue(light_indicator.reading,intensities[i]),
+                FadeIn(euler_sum_above[2*i], run_time = SWITCH_ON_RUN_TIME,
+                    rate_func = indicator_rate_func),
+                FadeIn(euler_sum_above[2*i - 1], run_time = SWITCH_ON_RUN_TIME,
+                    rate_func = indicator_rate_func),
+                ChangeDecimalToValue(light_indicator.reading,intensities[i],
+                    rate_func = indicator_rate_func, run_time = SWITCH_ON_RUN_TIME),
                 ApplyMethod(light_indicator.foreground.set_fill,None,opacities[i])
-                #UpdateLightIndicator(light_indicator, intensities[i])
             )
 
+            if i == 0:
+                # move a copy out of the thought bubble for comparison
+                light_indicator_copy = light_indicator.copy()
+                old_y = light_indicator_copy.get_center()[1]
+                new_y = self.number_line.get_center()[1]
+                self.play(
+                    light_indicator_copy.shift,[0, new_y - old_y,0]
+                )
+
+        # quickly switch on off-screen light cones and increment indicator
+        for (i,lc) in zip(range(NUM_VISIBLE_CONES,NUM_CONES),light_cones[NUM_VISIBLE_CONES:NUM_CONES]):
+            indicator_start_time = 0.5 * (i+1) * FAST_SWITCH_ON_RUN_TIME/lc.radius * self.number_line.unit_size
+            indicator_stop_time = indicator_start_time + FAST_INDICATOR_UPDATE_TIME
+            indicator_rate_func = squish_rate_func(#smooth, 0.8, 0.9)
+                smooth,indicator_start_time,indicator_stop_time)
+            self.play(
+                SwitchOn(lc, run_time = FAST_SWITCH_ON_RUN_TIME),
+                ChangeDecimalToValue(light_indicator.reading,intensities[i],
+                    rate_func = indicator_rate_func, run_time = FAST_SWITCH_ON_RUN_TIME),
+                ApplyMethod(light_indicator.foreground.set_fill,None,opacities[i])
+            )
+
+
+        # show limit value in light indicator and an equals sign
+        limit_reading = TexMobject("{\pi^2 \over 6}")
+        limit_reading.move_to(light_indicator.reading)
+
+        equals_sign = TexMobject("=")
+        equals_sign.next_to(randy, UP)
+        old_y = equals_sign.get_center()[1]
+        new_y = euler_sum_above.get_center()[1]
+        equals_sign.shift([0,new_y - old_y,0])
+
+        self.play(
+            FadeOut(light_indicator.reading),
+            FadeIn(limit_reading),
+            FadeIn(equals_sign),
+        )
 
             
 
         self.wait()
 
         
+
+class SingleLightHouseScene(PiCreatureScene):
+
+    def construct(self):
+
+        self.create_light_source_and_creature()
+
+
+
+    def create_light_source_and_creature(self):
+
+        SCREEN_SIZE = 3.0
+        DISTANCE_FROM_LIGHTHOUSE = 10.0
+        source_point = [-DISTANCE_FROM_LIGHTHOUSE/2,0,0]
+        observer_point = [DISTANCE_FROM_LIGHTHOUSE/2,0,0]
+
+        lighthouse = LightHouse()
+        candle = Candle(
+            opacity_function = inverse_quadratic(1,1),
+            num_annuli = LIGHT_CONE_NUM_SECTORS,
+            radius = 10,
+            brightness = 1,
+        )
+        lighthouse.scale(2).next_to(source_point, DOWN, buff = 0)
+        candle.move_to(source_point)
+        morty = self.get_primary_pi_creature()
+        morty.scale(0.5)
+        morty.move_to(observer_point)
+        self.add(lighthouse)
+        self.play(
+            SwitchOn(candle)
+        )
+
+        light_cone = LightCone(
+            opacity_function = inverse_quadratic(1,1),
+            num_sectors = LIGHT_CONE_NUM_SECTORS,
+            radius = 10,
+            brightness = 5,
+        )
+        light_cone.move_source_to(source_point)
+        screen = Line([0,-1,0],[0,1,0])
+        show_line_length(screen)
+
+        screen.rotate_in_place(-TAU/6)
+        show_line_length(screen)
+
+        screen.next_to(morty, LEFT, buff = 1)
+        
+        light_screen = LightScreen(light_source = source_point,
+            screen = screen, light_cone = light_cone)
+        light_screen.screen.color = WHITE
+        light_screen.screen.fill_opacity = 1
+        light_screen.update_light_cone(light_cone)
+        self.play(
+            FadeIn(light_screen, run_time = 2),
+        # dim the light that misses the screen
+            ApplyMethod(candle.set_brightness,0.3),
+            ApplyMethod(light_screen.update_shadow,light_screen.shadow),
+            FadeIn(light_cone),
+        )
+
+        lc_updater = lambda lc: light_screen.update_light_cone(lc)
+        sh_updater = lambda sh: light_screen.update_shadow(sh)
+
+        ca1 = ContinualUpdateFromFunc(light_screen.light_cone,
+           lc_updater)
+        ca2 = ContinualUpdateFromFunc(light_screen.shadow,
+           sh_updater)
+
+        self.add(ca1, ca2)
+        self.add_foreground_mobject(morty)
+
+        pointing_screen_at_source = ApplyMethod(screen.rotate_in_place,TAU/6)
+        self.play(pointing_screen_at_source)
+
+        arc_angle = light_cone.angle
+        # draw arc arrows to show the opening angle
+        angle_arc = Arc(radius = 5, start_angle = light_cone.start_angle,
+            angle = light_cone.angle, tip_length = ARC_TIP_LENGTH)
+        #angle_arc.add_tip(at_start = True, at_end = True)
+        angle_arc.move_arc_center_to(source_point)
+        
+        self.add(angle_arc)
+
+        angle_indicator = DecimalNumber(arc_angle/TAU*360,
+            num_decimal_points = 0,
+            unit = "^\\circ")
+        angle_indicator.next_to(angle_arc,RIGHT)
+        self.add_foreground_mobject(angle_indicator)
+
+        angle_update_func = lambda x: light_cone.angle/TAU*360
+        ca3 = ContinualChangingDecimal(angle_indicator,angle_update_func)
+        self.add(ca3)
+
+        #ca4 = ContinualUpdateFromFunc(angle_arc,update_angle_arc)
+        ca4 = AngleUpdater(angle_arc, light_screen.light_cone)
+        self.add(ca4)
+
+        rotating_screen = ApplyMethod(light_screen.screen.rotate_in_place, TAU/6, run_time=3, rate_func = wiggle)
+        self.play(rotating_screen)
+        
+        #rotating_screen_back = ApplyMethod(light_screen.screen.rotate_in_place, -TAU/6) #, run_time=3, rate_func = wiggle)
+        #self.play(rotating_screen_back)
+
+        self.wait()
+
+
+
+        # morph into Earth scene
+
+        globe = Circle(radius = 3)
+        globe.move_to([2,0,0])
+        sun_position = [-100,0,0]
+        self.play(
+            ApplyMethod(lighthouse.move_to,sun_position),
+            ApplyMethod(candle.move_to,sun_position),
+            ApplyMethod(light_cone.move_source_to,sun_position),
+            FadeOut(angle_arc),
+            FadeOut(angle_indicator),
+            FadeIn(globe),
+            ApplyMethod(light_screen.move_to,[0,0,0]),
+            ApplyMethod(morty.move_to,[1,0,0])
+
+        )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -36,17 +36,69 @@ class Arc(VMobject):
         )
         self.scale(self.radius, about_point = ORIGIN)
 
-    def add_tip(self, tip_length = 0.25):
+    def add_tip(self, tip_length = 0.25, at_start = False, at_end = True):
+        # clear out any old tips
+        for submob in self.submobjects:
+            if submob.mark_paths_closed == True: # is a tip
+                self.remove(submob)
+
         #TODO, do this a better way
-        p1, p2 = self.points[-2:]
-        arrow = Arrow(
-            p1, 2*p2 - p1, 
-            tip_length = tip_length,
-            max_tip_length_to_length_ratio = 2.0
-        )
-        self.add(arrow.split()[-1])
+        p1 = p2 = p3 = p4 = None
+        start_arrow = end_arrow = None
+        if at_start:
+            p1, p2 = self.points[-3:-1]
+            # self.points[-2:] did overshoot
+            start_arrow = Arrow(
+                p1, 2*p2 - p1, 
+                tip_length = tip_length,
+                max_tip_length_to_length_ratio = 2.0
+            )
+            self.add(start_arrow.split()[-1]) # just the tip
+
+        if at_end:
+            p4, p3 = self.points[1:3]
+            # self.points[:2] did overshoot
+            end_arrow = Arrow(
+                p3, 2*p4 - p3, 
+                tip_length = tip_length,
+                max_tip_length_to_length_ratio = 2.0
+            )
+            self.add(end_arrow.split()[-1])
+        
+
+
+
+        
         self.highlight(self.get_color())
         return self
+
+
+
+    def get_arc_center(self):
+        first_point = self.points[0]
+        radial_unit_vector = np.array([np.cos(self.start_angle),np.sin(self.start_angle),0])
+        arc_center = first_point - self.radius * radial_unit_vector
+        return arc_center
+
+
+    def move_arc_center_to(self,point):
+        v = point - self.get_arc_center()
+        self.shift(v)
+        return self
+
+
+    def stop_angle(self):
+        return self.start_angle + self.angle
+
+    def set_bound_angles(self,start=0,stop=np.pi):
+        self.start_angle = start
+        self.angle = stop - start
+        
+        return self
+
+
+
+
 
 class Circle(Arc):
     CONFIG = {
@@ -75,8 +127,6 @@ class Dot(Circle):
         Circle.__init__(self, **kwargs)
         self.shift(point)
         self.init_colors()
-
-
 
 class AnnularSector(VMobject):
     CONFIG = {
@@ -120,20 +170,14 @@ class AnnularSector(VMobject):
         v = last_point - first_point
         radial_unit_vector = v/np.linalg.norm(v)
         arc_center = first_point - self.inner_radius * radial_unit_vector
-
-
-
-        # radial_unit_vector = np.array([np.cos(self.start_angle),
-        #         np.sin(self.start_angle), 0])
-        # arc_center = inner_arc_start_point - inner_arc.radius * radial_unit_vector
         return arc_center
 
-
-
-
+    def move_arc_center_to(self,point):
+        v = point - self.get_arc_center()
+        self.shift(v)
+        return self
 
 class Sector(AnnularSector):
-
     CONFIG = {
         "outer_radius" : 1,
         "inner_radius" : 0
@@ -146,8 +190,6 @@ class Sector(AnnularSector):
     @radius.setter
     def radius(self,new_radius):
         self.outer_radius = new_radius
-
-
 
 class Annulus(Circle):
     CONFIG = {
@@ -167,11 +209,10 @@ class Annulus(Circle):
         inner_circle.flip()
         self.add_subpath(inner_circle.points)
 
-
 class Line(VMobject):
     CONFIG = {
         "buff" : 0,
-        "path_arc" : None,
+        "path_arc" : None, # angle of arc specified here
         "n_arc_anchors" : 10, #Only used if path_arc is not None
     }
     def __init__(self, start, end, **kwargs):

@@ -248,9 +248,9 @@ class Mobject(object):
             mob.points += about_point
         return self
 
-    def rotate_in_place(self, angle, axis = OUT, axes = []):
+    def rotate_in_place(self, angle, axis = OUT):
         # redundant with default behavior of rotate now.
-        return self.rotate(angle, axis = axis, axes = axes)
+        return self.rotate(angle, axis = axis)
 
     def scale_in_place(self, scale_factor, **kwargs):
         #Redundant with default behavior of scale now.
@@ -316,14 +316,29 @@ class Mobject(object):
         self.shift(target_point - point_to_align + buff*direction)
         return self
 
-    def align_to(self, mobject_or_point, direction = UP):
+    def align_to(self, mobject_or_point, direction = ORIGIN, alignment_vect = UP):
+        """
+        Examples: 
+        mob1.align_to(mob2, UP) moves mob1 vertically so that its
+        top edge lines ups with mob2's top edge.
+
+        mob1.align_to(mob2, alignment_vector = RIGHT) moves mob1
+        horizontally so that it's center is directly above/below
+        the center of mob2
+        """
         if isinstance(mobject_or_point, Mobject):
             mob = mobject_or_point
-            point = mob.get_edge_center(direction)
+            target_point = mob.get_critical_point(direction)
         else:
-            point = mobject_or_point
-        diff = point - self.get_edge_center(direction) 
-        self.shift(direction*np.dot(diff, direction))
+            target_point = mobject_or_point
+        direction_norm = np.linalg.norm(direction)
+        if direction_norm > 0:
+            alignment_vect = np.array(direction)/direction_norm
+            reference_point = self.get_critical_point(direction)
+        else:
+            reference_point = self.get_center()
+        diff = target_point - reference_point
+        self.shift(alignment_vect*np.dot(diff, alignment_vect))
         return self
 
     def shift_onto_screen(self, **kwargs):
@@ -427,6 +442,26 @@ class Mobject(object):
         )
         self.shift(start-self.points[0])
         return self
+
+    ## Match other mobvject properties
+
+    def match_color(self, mobject):
+        return self.highlight(mobject.get_color())
+
+    def match_dim(self, mobject, dim, **kwargs):
+        return self.rescale_to_fit(
+            mobject.length_over_dim(dim), dim,
+            **kwargs
+        )
+
+    def match_width(self, mobject):
+        return self.match_dim(mobject, 0)
+
+    def match_height(self, mobject):
+        return self.match_dim(mobject, 1)
+
+    def match_depth(self, mobject):
+        return self.match_dim(mobject, 2)
 
     ## Color functions
 
