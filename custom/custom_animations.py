@@ -72,6 +72,12 @@ class BubbleGrowFromPoint(BubbleAnimation):
         "content_animation_args"   : [ORIGIN],
     }
 
+class BubbleShrinkToPoint(BubbleGrowFromPoint):
+    CONFIG = {
+        "bubble_animation_kwargs"  : {"rate_func" : lambda t: 1-smooth(t)},
+        "content_animation_kwargs" : {"rate_func" : lambda t: 1-smooth(t)},
+    }
+
 
 
 
