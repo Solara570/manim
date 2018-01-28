@@ -176,7 +176,8 @@ class ThreeDScene(Scene):
             self.add(self.ambient_camera_rotation)
 
     def get_moving_mobjects(self, *animations):
-        if self.camera.rotation_mobject in moving:
+        is_camera_rotating = self.ambient_camera_rotation in self.continual_animations
+        if is_camera_rotating:
             return self.mobjects
         return Scene.get_moving_mobjects(self, *animations)
 
