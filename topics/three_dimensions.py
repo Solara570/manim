@@ -183,17 +183,10 @@ class ThreeDScene(Scene):
             self.add(self.ambient_camera_rotation)
 
     def get_moving_mobjects(self, *animations):
-<<<<<<< HEAD
-        is_camera_rotating = self.ambient_camera_rotation in self.continual_animations
-        if is_camera_rotating:
-            return self.mobjects
-        return Scene.get_moving_mobjects(self, *animations)
-=======
         moving_mobjects = Scene.get_moving_mobjects(self, *animations)
         if self.camera.rotation_mobject in moving_mobjects:
             return list_update(self.mobjects, moving_mobjects)
         return moving_mobjects
->>>>>>> 3b1b/master
 
 ##############
 
