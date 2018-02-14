@@ -54,6 +54,9 @@ RIGHT  = np.array(( 1., 0., 0.))
 LEFT   = np.array((-1., 0., 0.))
 IN     = np.array(( 0., 0.,-1.))
 OUT    = np.array(( 0., 0., 1.))
+X_AXIS = np.array(( 1., 0., 0.))
+Y_AXIS = np.array(( 0., 1., 0.))
+Z_AXIS = np.array(( 0., 0., 1.))
 
 TOP        = SPACE_HEIGHT*UP
 BOTTOM     = SPACE_HEIGHT*DOWN
@@ -63,6 +66,9 @@ RIGHT_SIDE = SPACE_WIDTH*RIGHT
 ###
 THIS_DIR          = os.path.dirname(os.path.realpath(__file__))
 FILE_DIR          = os.path.join(THIS_DIR, "files")
+
+TAU = 2*np.pi
+DEGREES = TAU/360
 
 # Change this to point to where you want 
 # animation files to output

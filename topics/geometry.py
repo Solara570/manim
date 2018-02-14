@@ -96,7 +96,6 @@ class Arc(VMobject):
         
         return self
 
-
 class Circle(Arc):
     CONFIG = {
         "color" : RED,
@@ -136,7 +135,6 @@ class Ellipse(VMobject):
         circle = circle.stretch_to_fit_width(self.width)
         circle = circle.stretch_to_fit_height(self.height)
         self.points = circle.points
-
 
 class AnnularSector(VMobject):
     CONFIG = {
@@ -186,7 +184,6 @@ class AnnularSector(VMobject):
         v = point - self.get_arc_center()
         self.shift(v)
         return self
-
 
 class Sector(AnnularSector):
     CONFIG = {
@@ -356,7 +353,7 @@ class Line(VMobject):
     def insert_n_anchor_points(self, n):
         if not self.path_arc:
             n_anchors = self.get_num_anchor_points()
-            new_num_points = 3*(n_anchors + n)+1
+            new_num_points = 3*(n_anchors + n)-2
             self.points = np.array([
                 self.point_from_proportion(alpha)
                 for alpha in np.linspace(0, 1, new_num_points)

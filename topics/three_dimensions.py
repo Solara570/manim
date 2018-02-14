@@ -28,33 +28,32 @@ class ThreeDCamera(CameraWithPerspective):
     CONFIG = {
         "sun_vect" : 5*UP+LEFT,
         "shading_factor" : 0.2,
-        "distance" : 5,
+        "distance" : 5.,
+        "default_distance" : 5.,
         "phi" : 0, #Angle off z axis
         "theta" : -TAU/4, #Rotation about z axis
     }
     def __init__(self, *args, **kwargs):
         Camera.__init__(self, *args, **kwargs)
         self.unit_sun_vect = self.sun_vect/np.linalg.norm(self.sun_vect)
-        ## Lives in the phi-theta-distance space
+        ## rotation_mobject lives in the phi-theta-distance space
         self.rotation_mobject = VectorizedPoint()
+        ## moving_center lives in the x-y-z space
+        ## It representes the center of rotation
+        self.moving_center = VectorizedPoint(self.space_center)
         self.set_position(self.phi, self.theta, self.distance)
 
-    def get_color(self, method):
-        color = method()
-        vmobject = method.im_self
+    def modified_rgb(self, vmobject, rgb):
         if should_shade_in_3d(vmobject):
-            return Color(rgb = self.get_shaded_rgb(
-                color_to_rgb(color),
-                normal_vect = self.get_unit_normal_vect(vmobject)
-            ))
+            return self.get_shaded_rgb(rgb, self.get_unit_normal_vect(vmobject))
         else:
-            return color
+            return rgb
 
-    def get_stroke_color(self, vmobject):
-        return self.get_color(vmobject.get_stroke_color)
+    def get_stroke_rgb(self, vmobject):
+        return self.modified_rgb(vmobject, vmobject.get_stroke_rgb())
 
-    def get_fill_color(self, vmobject):
-        return self.get_color(vmobject.get_fill_color)
+    def get_fill_rgb(self, vmobject):
+        return self.modified_rgb(vmobject, vmobject.get_fill_rgb())
 
     def get_shaded_rgb(self, rgb, normal_vect):
         brightness = np.dot(normal_vect, self.unit_sun_vect)**2
@@ -82,22 +81,22 @@ class ThreeDCamera(CameraWithPerspective):
             *self.get_spherical_coords()
         )
         def z_cmp(*vmobs):
-            #Compare to three dimensional mobjects based on 
-            #how close they are to the camera
-            return cmp(*[
-                -np.linalg.norm(vm.get_center()-camera_point)
-                for vm in vmobs
-            ])
-            # three_d_status = map(should_shade_in_3d, vmobs)
-            # has_points = [vm.get_num_points() > 0 for vm in vmobs]
-            # if all(three_d_status) and all(has_points):
-            #     cmp_vect = self.get_unit_normal_vect(vmobs[1])
-            #     return cmp(*[
-            #         np.dot(vm.get_center(), cmp_vect)
-            #         for vm in vmobs
-            #     ])
-            # else:
-            #     return 0
+            # Compare to three dimensional mobjects based on 
+            # how close they are to the camera
+            # return cmp(*[
+            #     -np.linalg.norm(vm.get_center()-camera_point)
+            #     for vm in vmobs
+            # ])
+            three_d_status = map(should_shade_in_3d, vmobs)
+            has_points = [vm.get_num_points() > 0 for vm in vmobs]
+            if all(three_d_status) and all(has_points):
+                cmp_vect = self.get_unit_normal_vect(vmobs[1])
+                return cmp(*[
+                    np.dot(vm.get_center(), cmp_vect)
+                    for vm in vmobs
+                ])
+            else:
+                return 0
         Camera.display_multiple_vectorized_mobjects(
             self, sorted(vmobjects, cmp = z_cmp)
         )
@@ -108,6 +107,13 @@ class ThreeDCamera(CameraWithPerspective):
         if theta is None: theta = curr_theta
         if distance is None: distance = curr_d
         return np.array([phi, theta, distance])
+
+    def get_cartesian_coords(self, phi = None, theta = None, distance = None):
+        spherical_coords_array = self.get_spherical_coords(phi,theta,distance)
+        phi2 = spherical_coords_array[0]
+        theta2 = spherical_coords_array[1]
+        d2 = spherical_coords_array[2]
+        return self.spherical_coords_to_point(phi2,theta2,d2)
 
     def get_phi(self):
         return self.get_spherical_coords()[0]
@@ -125,13 +131,27 @@ class ThreeDCamera(CameraWithPerspective):
             np.cos(phi)
         ])
 
-    def set_position(self, phi = None, theta = None, distance = None):
+    def get_center_of_rotation(self, x = None, y = None, z = None):
+        curr_x, curr_y, curr_z = self.moving_center.points[0]
+        if x is None:
+            x = curr_x
+        if y is None:
+            y = curr_y
+        if z is None:
+            z = curr_z
+        return np.array([x, y, z])
+
+    def set_position(self, phi = None, theta = None, distance = None,
+                     center_x = None, center_y = None, center_z = None):
         point = self.get_spherical_coords(phi, theta, distance)
         self.rotation_mobject.move_to(point)
         self.phi, self.theta, self.distance = point
+        center_of_rotation = self.get_center_of_rotation(center_x, center_y, center_z)
+        self.moving_center.move_to(center_of_rotation)
+        self.space_center = self.moving_center.points[0]
 
     def get_view_transformation_matrix(self):
-        return np.dot(
+        return (self.default_distance / self.get_distance()) * np.dot(
             rotation_matrix(self.get_phi(), LEFT),
             rotation_about_z(-self.get_theta() - np.pi/2),
         )
@@ -139,6 +159,8 @@ class ThreeDCamera(CameraWithPerspective):
     def points_to_pixel_coords(self, points):
         matrix = self.get_view_transformation_matrix()
         new_points = np.dot(points, matrix.T)
+        self.space_center = self.moving_center.points[0]
+
         return Camera.points_to_pixel_coords(self, new_points)
 
 class ThreeDScene(Scene):
@@ -147,8 +169,9 @@ class ThreeDScene(Scene):
         "ambient_camera_rotation" : None,
     }
 
-    def set_camera_position(self, phi = None, theta = None, distance = None):
-        self.camera.set_position(phi, theta, distance)
+    def set_camera_position(self, phi = None, theta = None, distance = None,
+                            center_x = None, center_y = None, center_z = None):
+        self.camera.set_position(phi, theta, distance, center_x, center_y, center_z)
 
     def begin_ambient_camera_rotation(self, rate = 0.01):
         self.ambient_camera_rotation = AmbientMovement(
@@ -164,8 +187,9 @@ class ThreeDScene(Scene):
         self.ambient_camera_rotation = None
 
     def move_camera(
-        self, 
+        self,
         phi = None, theta = None, distance = None,
+        center_x = None, center_y = None, center_z = None,
         added_anims = [],
         **kwargs
         ):
@@ -175,10 +199,17 @@ class ThreeDScene(Scene):
             target_point,
             **kwargs
         )
+        target_center = self.camera.get_center_of_rotation(center_x, center_y, center_z)
+        movement_center = ApplyMethod(
+            self.camera.moving_center.move_to,
+            target_center,
+            **kwargs
+        )
         is_camera_rotating = self.ambient_camera_rotation in self.continual_animations
         if is_camera_rotating:
             self.remove(self.ambient_camera_rotation)
-        self.play(movement, *added_anims)
+        self.play(movement, movement_center, *added_anims)
+        target_point = self.camera.get_spherical_coords(phi, theta, distance)
         if is_camera_rotating:
             self.add(self.ambient_camera_rotation)
 

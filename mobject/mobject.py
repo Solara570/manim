@@ -103,7 +103,8 @@ class Mobject(Container):
     def copy(self):
         #TODO, either justify reason for shallow copy, or
         #remove this redundancy everywhere
-        # return self.deepcopy() 
+        return self.deepcopy()
+
         copy_mobject = copy.copy(self)
         copy_mobject.points = np.array(self.points)
         copy_mobject.submobjects = [
@@ -295,6 +296,7 @@ class Mobject(Container):
                 aligned_edge = ORIGIN,
                 submobject_to_align = None,
                 index_of_submobject_to_align = None,
+                coor_mask = np.array([1,1,1]),
                 ):
         if isinstance(mobject_or_point, Mobject):
             mob = mobject_or_point
@@ -314,7 +316,7 @@ class Mobject(Container):
         else:
             aligner = self
         point_to_align = aligner.get_critical_point(aligned_edge - direction)
-        self.shift(target_point - point_to_align + buff*direction)
+        self.shift((target_point - point_to_align + buff*direction)*coor_mask)
         return self
 
     def align_to(self, mobject_or_point, direction = ORIGIN, alignment_vect = UP):
@@ -402,13 +404,14 @@ class Mobject(Container):
             submob.scale(1./factor)
         return self
 
-    def move_to(self, point_or_mobject, aligned_edge = ORIGIN):
+    def move_to(self, point_or_mobject, aligned_edge = ORIGIN,
+                coor_mask = np.array([1,1,1])):
         if isinstance(point_or_mobject, Mobject):
             target = point_or_mobject.get_critical_point(aligned_edge)
         else:
             target = point_or_mobject
         point_to_align = self.get_critical_point(aligned_edge)
-        self.shift(target - point_to_align)
+        self.shift((target - point_to_align)*coor_mask)
         return self
 
     def replace(self, mobject, dim_to_match = 0, stretch = False):
@@ -770,10 +773,10 @@ class Mobject(Container):
             self.null_point_align(mobject)
         self_count = len(self.submobjects)
         mob_count = len(mobject.submobjects)
-        diff = abs(self_count-mob_count)
-        if self_count < mob_count:
-            self.add_n_more_submobjects(diff)
-        elif mob_count < self_count:
+        diff = self_count-mob_count
+        if diff < 0:
+            self.add_n_more_submobjects(-diff)
+        elif diff > 0:
             mobject.add_n_more_submobjects(diff)
         return self
 
