@@ -15,9 +15,9 @@ def rotate(points, angle = np.pi, axis = OUT):
     points = np.dot(points, np.transpose(matrix))
     return points
 
-def fractalify(vmobject, order = 3, *args, **kwargs):
+def fractalify(vmobject, order = 3, **kwargs):
     for x in range(order):
-        fractalification_iteration(vmobject)
+        fractalification_iteration(vmobject, **kwargs)
     return vmobject
 
 def fractalification_iteration(vmobject, dimension = 1.05, num_inserted_anchors_range = range(1, 4)):
