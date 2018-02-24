@@ -245,9 +245,9 @@ class Mobject(Container):
         if about_point is None:
             about_point = self.get_critical_point(about_edge)
         for mob in self.family_members_with_points():
-            mob.points -= about_point
+            mob.points = mob.points - about_point
             mob.points = func(mob.points)
-            mob.points += about_point
+            mob.points = mob.points + about_point
         return self
 
     def rotate_in_place(self, angle, axis = OUT):
