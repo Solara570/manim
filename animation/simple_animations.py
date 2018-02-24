@@ -3,11 +3,11 @@ import itertools as it
 
 from helpers import *
 
+import warnings
 from mobject import Mobject, Group
 from mobject.vectorized_mobject import VMobject
 from mobject.tex_mobject import TextMobject
 from animation import Animation
-from animation import sync_animation_run_times_and_rate_funcs
 from transform import Transform
 
 class Rotating(Animation):
@@ -408,8 +408,8 @@ class Succession(Animation):
         self.run_times = [anim.run_time for anim in animations]
         if "run_time" in kwargs:
             run_time = kwargs.pop("run_time")
-        else:
-            run_time = sum(self.run_times)
+            warnings.warn("Succession doesn't currently support explicit run_time.")
+        run_time = sum(self.run_times)
         self.num_anims = len(animations)
         if self.num_anims == 0:
             self.empty = True
@@ -443,27 +443,42 @@ class Succession(Animation):
 
     # Beware: This does NOT take care of calling update(0) on the subanimation.
     # This was important to avoid a pernicious possibility in which subanimations were called
-    # with update(0) twice, which could in turn call a sub-Succession with update(0) four times,
+    # with update twice, which could in turn call a sub-Succession with update four times,
     # continuing exponentially.
     def jump_to_start_of_anim(self, index):
         if index != self.current_anim_index:
             self.mobject.remove(*self.mobject.submobjects) # Should probably have a cleaner "remove_all" method...
-            for m in self.scene_mobjects_at_time[index].submobjects:
-                self.mobject.add(m)
+            self.mobject.add(*self.scene_mobjects_at_time[index].submobjects)
             self.mobject.add(self.animations[index].mobject)
+
+        for i in range(index):
+            self.animations[i].update(1)
 
         self.current_anim_index = index
         self.current_alpha = self.critical_alphas[index]
 
     def update_mobject(self, alpha):
         if self.num_anims == 0:
+            # This probably doesn't matter for anything, but just in case,
+            # we want it in the future, we set current_alpha even in this case
+            self.current_alpha = alpha
             return
 
-        i = 0
-        while self.critical_alphas[i + 1] < alpha:
-            i = i + 1
-            # TODO: Special handling if alpha < 0 or alpha > 1, to use
-            # first or last sub-animation
+        gt_alpha_list = filter(
+            lambda i : self.critical_alphas[i+1] >= alpha, 
+            range(len(self.critical_alphas)-1)
+        )
+        if gt_alpha_list:
+            i = gt_alpha_list[0]
+        else:
+            if not abs(alpha - 1) < 0.001:
+                warnings.warn(
+                    "Rounding error not near alpha=1 in Succession.update_mobject," + \
+                    "instead alpha = %f"%alpha
+                )
+                print self.critical_alphas, alpha
+            i = len(self.critical_alphas) - 2
+        #
 
         # At this point, we should have self.critical_alphas[i] <= alpha <= self.critical_alphas[i +1]
 
@@ -474,6 +489,7 @@ class Succession(Animation):
             alpha
         )
         self.animations[i].update(sub_alpha)
+        self.current_alpha = alpha
 
     def clean_up(self, *args, **kwargs):
         # We clean up as though we've played ALL animations, even if
@@ -486,25 +502,33 @@ class AnimationGroup(Animation):
         "rate_func" : None
     }
     def __init__(self, *sub_anims, **kwargs):
-        digest_config(self, kwargs, locals())
         sub_anims = filter (lambda x : not(x.empty), sub_anims)
+        digest_config(self, locals())
+        self.update_config(**kwargs) # Handles propagation to self.sub_anims
+
         if len(sub_anims) == 0:
             self.empty = True
             self.run_time = 0
         else:
-            # Should really make copies of animations, instead of messing with originals...
-            sync_animation_run_times_and_rate_funcs(*sub_anims, **kwargs)
             self.run_time = max([a.run_time for a in sub_anims])
         everything = Mobject(*[a.mobject for a in sub_anims])
         Animation.__init__(self, everything, **kwargs)
 
-    def update_mobject(self, alpha):
+    def update(self, alpha):
         for anim in self.sub_anims:
-            anim.update(alpha)
+            anim.update(alpha * self.run_time / anim.run_time)
 
     def clean_up(self, *args, **kwargs):
         for anim in self.sub_anims:
             anim.clean_up(*args, **kwargs)
+
+    def update_config(self, **kwargs):
+        Animation.update_config(self, **kwargs)
+        
+        # If AnimationGroup is called with any configuration,
+        # it is propagated to the sub_animations
+        for anim in self.sub_anims:
+            anim.update_config(**kwargs)
 
 class EmptyAnimation(Animation):
     CONFIG = {
@@ -514,3 +538,4 @@ class EmptyAnimation(Animation):
 
     def __init__(self, *args, **kwargs):
         return Animation.__init__(self, Group(), *args, **kwargs)
+

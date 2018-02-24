@@ -54,10 +54,14 @@ class VMobject(Mobject):
         if fill_opacity is not None:
             self.fill_opacity = fill_opacity
         if family:
-            kwargs = locals()
-            kwargs.pop("self")
             for mob in self.submobjects:
-                mob.set_style_data(**kwargs)
+                mob.set_style_data(
+                    stroke_color = stroke_color,
+                    stroke_width  = stroke_width,
+                    fill_color = fill_color,
+                    fill_opacity  = fill_opacity,
+                    family = family
+                )
         return self
 
     def set_fill(self, color = None, opacity = None, family = True):
@@ -122,7 +126,7 @@ class VMobject(Mobject):
         return self
 
     def get_fill_rgb(self):
-        return self.fill_rgb
+        return np.clip(self.fill_rgb, 0, 1)
 
     def get_fill_color(self):
         try:
@@ -135,7 +139,7 @@ class VMobject(Mobject):
         return np.clip(self.fill_opacity, 0, 1)
 
     def get_stroke_rgb(self):
-        return self.stroke_rgb
+        return np.clip(self.stroke_rgb, 0, 1)
 
     def get_stroke_color(self):
         try:

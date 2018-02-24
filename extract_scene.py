@@ -70,6 +70,17 @@ def get_configuration():
       parser.add_argument("-o", "--output_name")
       parser.add_argument("-n", "--start_at_animation_number")
       args = parser.parse_args()
+      if args.output_name != None:
+         output_name_root, output_name_ext = os.path.splitext(args.output_name)
+         expected_ext = '.png' if args.show_last_frame else '.mp4'
+         if not output_name_ext in ['', expected_ext]:
+            print "WARNING: The output will be to (doubly-dotted) %s%s"%output_name_root%expected_ext
+            output_name = args.output_name
+         else:
+            # If anyone wants .mp4.mp4 and is surprised to only get .mp4, or such... Well, too bad.
+            output_name = output_name_root
+      else:
+         output_name = args.output_name
    except argparse.ArgumentError as err:
       print(str(err))
       sys.exit(2)
@@ -84,10 +95,11 @@ def get_configuration():
       "save_pngs"       : args.save_pngs,
       #If -t is passed in (for transparent), this will be RGBA
       "saved_image_mode": "RGBA" if args.transparent else "RGB",
+      "movie_file_extension" : ".mov" if args.transparent else ".mp4",
       "quiet"           : args.quiet or args.write_all,
       "ignore_waits"    : args.preview,
       "write_all"       : args.write_all,
-      "output_name"     : args.output_name,
+      "output_name"     : output_name,
       "start_at_animation_number" : args.start_at_animation_number,
       "end_at_animation_number" : None,
    }
@@ -227,6 +239,7 @@ def main():
          "write_to_movie",
          "output_directory",
          "save_pngs",
+         "movie_file_extension",
          "start_at_animation_number",
          "end_at_animation_number",
       ]
