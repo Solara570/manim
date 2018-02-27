@@ -107,7 +107,7 @@ class Camera(object):
 
     def set_pixel_array(self, pixel_array, convert_from_floats = False):
         converted_array = self.convert_pixel_array(pixel_array, convert_from_floats)
-        if not hasattr(self, "pixel_array"): #TODO: And the shapes match?
+        if not (hasattr(self, "pixel_array") and self.pixel_array.shape == converted_array.shape): 
             self.pixel_array = converted_array
         else:
             #Set in place
@@ -394,7 +394,7 @@ class Camera(object):
             y0 = max(y0, 0)
             image[y0:y1, x0:x1] = stretched_impa[siy0:siy1, six0:six1]
         else:
-            # Alternate (slower) tactice if image is tilted
+            # Alternate (slower) tactic if image is tilted
             # List of all coordinates of pixels, given as (x, y), 
             # which matches the return type of points_to_pixel_coords,
             # even though np.array indexing naturally happens as (y, x)
@@ -441,12 +441,12 @@ class Camera(object):
 
         # When the output alpha is 0 for full transparency, 
         # we have a choice over what RGB value to use in our
-        # output representation. We choose 0.0 here.
+        # output representation. We choose 0 here.
         out_rgb = fdiv(
             src_rgb*src_a[..., None] + \
             dst_rgb*dst_a[..., None]*(1.0-src_a[..., None]),
             out_a[..., None],
-            zero_over_zero_value = 0.0
+            zero_over_zero_value = 0
         )
 
         self.pixel_array[..., :3] = out_rgb*self.rgb_max_val
@@ -618,7 +618,7 @@ class MovingCamera(Camera):
 
     def capture_mobjects(self, *args, **kwargs):
         self.space_center = self.mobject.get_center()
-        self.realign_space_shape()        
+        self.realign_space_shape()
         Camera.capture_mobjects(self, *args, **kwargs)
 
     def realign_space_shape(self):
