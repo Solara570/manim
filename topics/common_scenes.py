@@ -3,7 +3,8 @@ from helpers import *
 
 from scene.scene import Scene
 from animation import Animation
-from animation.simple_animations import Write, DrawBorderThenFill, LaggedStart
+from animation.simple_animations import Write, DrawBorderThenFill
+from animation.compositions import LaggedStart
 from animation.transform import FadeIn, FadeOut, ApplyMethod
 from mobject.vectorized_mobject import VGroup
 from mobject.tex_mobject import TexMobject, TextMobject
@@ -123,13 +124,16 @@ class PatreonEndScreen(PatreonThanks):
         "n_patron_columns" : 3,
         "max_patron_width" : 3,
         "run_time" : 20,
+        "randomize_order" : True,
     }
     def construct(self):
+        if self.randomize_order:
+            random.shuffle(self.specific_patrons)
         self.add_title()
         self.scroll_through_patrons()
 
     def add_title(self):
-        title = TextMobject("Clicky Stuffs")
+        title = self.title = TextMobject("Clicky Stuffs")
         title.scale(1.5)
         title.to_edge(UP, buff = MED_SMALL_BUFF)
 
@@ -140,7 +144,6 @@ class PatreonEndScreen(PatreonThanks):
             pi.look(DOWN)
             pi.next_to(title, vect, buff = MED_LARGE_BUFF)
         self.add_foreground_mobjects(title, randy, morty)
-
 
     def scroll_through_patrons(self):
         logo_box = Square(side_length = 2.5)
@@ -176,7 +179,7 @@ class PatreonEndScreen(PatreonThanks):
             aligned_edge = UP,
         )
         columns.scale_to_fit_width(total_width - 1)
-        columns.next_to(black_rect, DOWN, LARGE_BUFF)
+        columns.next_to(black_rect, DOWN, 3*LARGE_BUFF)
         columns.to_edge(RIGHT)
 
         self.play(

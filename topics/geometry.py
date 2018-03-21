@@ -96,6 +96,57 @@ class Arc(VMobject):
         
         return self
 
+
+
+class ArcBetweenPoints(Arc):
+
+    def __init__(self, start_point, end_point, angle = TAU/4, **kwargs):
+        if angle == 0:
+            raise Exception("Arc with zero curve angle: use Line instead.")
+
+        midpoint = 0.5 * (start_point + end_point)
+        distance_vector = end_point - start_point
+        normal_vector = np.array([-distance_vector[1], distance_vector[0],0])
+        distance = np.linalg.norm(normal_vector)
+        normal_vector /= distance
+        if angle < 0:
+            normal_vector *= -1
+
+        radius = distance/2 / np.sin(0.5 * np.abs(angle))
+        l = distance/2 / np.tan(0.5 * np.abs(angle))
+        arc_center = midpoint + l * normal_vector
+        w = start_point - arc_center
+        if w[0] != 0:
+            start_angle = np.arctan2(w[1],w[0])
+        else:
+            start_angle = np.pi/2
+
+        Arc.__init__(self, angle,
+            radius = radius,
+            start_angle = start_angle,
+            **kwargs)
+        
+        self.move_arc_center_to(arc_center)
+
+class CurvedArrow(ArcBetweenPoints):
+
+    def __init__(self, start_point, end_point, angle = TAU/4, **kwargs):
+        # I know this is in reverse, but it works
+        if angle >= 0:
+            ArcBetweenPoints.__init__(self, start_point, end_point, angle = angle, **kwargs)
+            self.add_tip(at_start = True, at_end = False)
+        else:
+            ArcBetweenPoints.__init__(self, end_point, start_point, angle = -angle, **kwargs)
+            self.add_tip(at_start = False, at_end = True)
+        
+
+class CurvedDoubleArrow(ArcBetweenPoints):
+
+    def __init__(self, start_point, end_point, angle = TAU/4, **kwargs):
+        ArcBetweenPoints.__init__(self, start_point, end_point, angle = angle, **kwargs)
+        self.add_tip(at_start = True, at_end = True)
+
+
 class Circle(Arc):
     CONFIG = {
         "color" : RED,
@@ -657,15 +708,6 @@ class BackgroundRectangle(SurroundingRectangle):
     def get_fill_color(self):
         return Color(self.color)
 
-class FullScreenFadeRectangle(Rectangle):
-    CONFIG = {
-        "height" : 2*SPACE_HEIGHT,
-        "width" : 2*SPACE_WIDTH,
-        "stroke_width" : 0,
-        "fill_color" : BLACK,
-        "fill_opacity" : 0.7,
-    }
-
 class ScreenRectangle(Rectangle):
     CONFIG = {
         "width_to_height_ratio" : 16.0/9.0,
@@ -674,6 +716,18 @@ class ScreenRectangle(Rectangle):
     def generate_points(self):
         self.width = self.width_to_height_ratio * self.height
         Rectangle.generate_points(self)
+
+class FullScreenRectangle(ScreenRectangle):
+    CONFIG = {
+        "height" : 2*SPACE_HEIGHT,
+    }
+
+class FullScreenFadeRectangle(FullScreenRectangle):
+    CONFIG = {
+        "stroke_width" : 0,
+        "fill_color" : BLACK,
+        "fill_opacity" : 0.7,
+    }
 
 class PictureInPictureFrame(Rectangle):
     CONFIG = {

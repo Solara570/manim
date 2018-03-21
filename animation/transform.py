@@ -101,9 +101,15 @@ class Swap(CyclicReplace):
     pass #Renaming, more understandable for two entries
 
 class GrowFromPoint(Transform):
+    CONFIG = {
+        "point_color" : None,
+    }
     def __init__(self, mobject, point, **kwargs):
+        digest_config(self, kwargs)
         target = mobject.copy()
         point_mob = Point(point)
+        if self.point_color:
+            point_mob.highlight(self.point_color)
         mobject.replace(point_mob)
         mobject.highlight(point_mob.get_color())
         Transform.__init__(self, mobject, target, **kwargs)
@@ -162,9 +168,6 @@ class FadeOut(Transform):
     def __init__(self, mobject, **kwargs):
         target = mobject.copy()
         target.fade(1)
-        if isinstance(mobject, VMobject):
-            target.set_stroke(width = 0)
-            target.set_fill(opacity = 0)
         Transform.__init__(self, mobject, target, **kwargs)
 
     def clean_up(self, surrounding_scene = None):

@@ -6,6 +6,7 @@ import scipy
 from animation.animation import Animation
 from animation.transform import *
 from animation.simple_animations import *
+from animation.compositions import *
 from animation.playground import *
 from animation.continual_animation import *
 from topics.geometry import *
@@ -1842,7 +1843,7 @@ class IntroduceDopplerRadar(Scene):
         words = ["Original signal", "Echo"]
         for graph, word in zip([pulse_graph, echo_graph], words):
             arrow = Vector(DOWN)
-            arrow.next_to(graph.peak_point, UP, MED_SMALL_BUFF)
+            arrow.next_to(graph.peak_point, UP, SMALL_BUFF)
             arrow.match_color(graph)
             graph.arrow = arrow
             label = TextMobject(word)
@@ -2399,7 +2400,6 @@ class RadarOperatorUncertainty(Scene):
         vector_gdw.scale(0.05)
         vector_gdw.move_to(plane_gdw)
         vector_gdw.shift(2*RIGHT)
-
 
         self.add(randy, dish, bubble, plane_cloud, pulse)
         self.play(randy.change, "confused")

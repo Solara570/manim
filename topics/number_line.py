@@ -120,6 +120,9 @@ class NumberLine(VMobject):
             result.add(mob)
         return result
 
+    def get_labels(self):
+        return self.get_number_mobjects()
+
     def add_numbers(self, *numbers, **kwargs):
         self.numbers = self.get_number_mobjects(
             *numbers, **kwargs
@@ -241,7 +244,7 @@ class Axes(VGroup):
                 elif lx > x and rx < x:
                     lh, rh = rh, lh
             return points[1]
-
+        return self.coords_to_point(x, graph.underlying_function(x))
 
 class ThreeDAxes(Axes):
     CONFIG = {
@@ -258,6 +261,7 @@ class NumberPlane(VMobject):
         "secondary_color" : BLUE_E,
         "axes_color" : WHITE,
         "secondary_stroke_width" : 1,
+        # TODO: Allow coordinate center of NumberPlane to not be at (0, 0)
         "x_radius": None,
         "y_radius": None,
         "x_unit_size" : 1,

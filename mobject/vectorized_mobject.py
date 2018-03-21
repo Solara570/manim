@@ -113,16 +113,15 @@ class VMobject(Mobject):
             sm1.match_style(sm2)
         return self
 
-    def fade(self, darkness = 0.5):
-        for submob in self.submobject_family():
-            submob.set_stroke(
-                width = (1-darkness)*submob.get_stroke_width(),
-                family = False
-            )
-            submob.set_fill(
-                opacity = (1-darkness),
-                family = False
-            )
+    def fade_no_recurse(self, darkness):
+        self.set_stroke(
+            width = (1-darkness)*self.get_stroke_width(),
+            family = False
+        )
+        self.set_fill(
+            opacity = (1-darkness)*self.get_fill_opacity(),
+            family = False
+        )
         return self
 
     def get_fill_rgb(self):
@@ -165,6 +164,10 @@ class VMobject(Mobject):
 
     def get_background_image_file(self):
         return self.background_image_file
+
+    def match_background_image_file(self, vmobject):
+        self.color_using_background_image(vmobject.get_background_image_file())
+        return self
 
     ## Drawing
     def start_at(self, point):
@@ -248,7 +251,6 @@ class VMobject(Mobject):
         a single "path", in the svg sense of the word.
         However, one such path may really consist of separate
         continuous components if there is a move_to command.
-
         These other portions of the path will be treated as submobjects,
         but will be tracked in a separate special list for when
         it comes time to display.
@@ -291,7 +293,6 @@ class VMobject(Mobject):
         If the distance between a given handle point H and its associated
         anchor point A is d, then it changes H to be a distances factor*d
         away from A, but so that the line from A to H doesn't change.
-
         This is mostly useful in the context of applying a (differentiable) 
         function, to preserve tangency properties.  One would pull all the 
         handles closer to their anchors, apply the function then push them out
@@ -484,5 +485,4 @@ class VectorizedPoint(VMobject):
 
     def set_location(self,new_loc):
         self.set_points(np.array([new_loc]))
-
 
