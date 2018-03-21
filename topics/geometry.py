@@ -111,6 +111,7 @@ class Circle(Arc):
         self.replace(mobject, dim_to_match, stretch)
         self.scale_to_fit_width(np.sqrt(mobject.get_width()**2 + mobject.get_height()**2))
         self.scale(buffer_factor)
+        return self
 
 class Dot(Circle):
     CONFIG = {
