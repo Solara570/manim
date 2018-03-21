@@ -272,6 +272,14 @@ class Mobject(Container):
         self.shift(-self.get_center())
         return self
 
+    def horizontally_center(self):
+        self.shift(-self.get_center()[0] * RIGHT)
+        return self
+
+    def vertically_center(self):
+        self.shift(-self.get_center()[1] * UP)
+        return self
+
     def align_on_border(self, direction, buff = DEFAULT_MOBJECT_TO_EDGE_BUFFER):
         """
         Direction just needs to be a vector pointing towards side or
