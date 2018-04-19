@@ -1,12 +1,14 @@
+from __future__ import absolute_import
+
 import numpy as np
 
-from scene import Scene
-from animation.transform import FadeIn
-from mobject import Mobject
-from topics.geometry import Rectangle
-from camera import MovingCamera, Camera
+from scene.scene import Scene
+from animation.creation import FadeIn
+from camera.moving_camera import MovingCamera
+from mobject.geometry import Rectangle
 
-from helpers import *
+from constants import *
+
 
 class ZoomedScene(Scene):
     """
@@ -14,16 +16,17 @@ class ZoomedScene(Scene):
     which part of the screen is zoomed in on.
     """
     CONFIG = {
-        "zoomed_canvas_space_shape" : (3, 3),
-        "zoomed_canvas_center"      : None,
-        "zoomed_canvas_corner"      : UP+RIGHT,
-        "zoomed_canvas_corner_buff" : DEFAULT_MOBJECT_TO_EDGE_BUFFER,
-        "zoomed_camera_background"  : None,
-        "little_rectangle_start_position" : ORIGIN,
-        "zoom_factor"               : 6,
-        "square_color"              : WHITE,
-        "zoom_activated"            : False,
+        "zoomed_canvas_frame_shape": (3, 3),
+        "zoomed_canvas_center": None,
+        "zoomed_canvas_corner": UP + RIGHT,
+        "zoomed_canvas_corner_buff": DEFAULT_MOBJECT_TO_EDGE_BUFFER,
+        "zoomed_camera_background": None,
+        "little_rectangle_start_position": ORIGIN,
+        "zoom_factor": 6,
+        "square_color": WHITE,
+        "zoom_activated": False,
     }
+
     def activate_zooming(self):
         self.generate_big_rectangle()
         self.setup_zoomed_canvas()
@@ -47,49 +50,48 @@ class ZoomedScene(Scene):
         return self.big_rectangle
 
     def generate_big_rectangle(self):
-        height, width = self.zoomed_canvas_space_shape
+        height, width = self.zoomed_canvas_frame_shape
         self.big_rectangle = Rectangle(
-            height = height,
-            width = width,
-            color = self.square_color
+            height=height,
+            width=width,
+            color=self.square_color
         )
         if self.zoomed_canvas_center is not None:
             self.big_rectangle.shift(self.zoomed_canvas_center)
         elif self.zoomed_canvas_corner is not None:
             self.big_rectangle.to_corner(
                 self.zoomed_canvas_corner,
-                buff = self.zoomed_canvas_corner_buff
+                buff=self.zoomed_canvas_corner_buff
             )
         self.add(self.big_rectangle)
 
-
     def setup_zoomed_canvas(self):
-        upper_left = self.big_rectangle.get_corner(UP+LEFT)
-        lower_right = self.big_rectangle.get_corner(DOWN+RIGHT)
+        upper_left = self.big_rectangle.get_corner(UP + LEFT)
+        lower_right = self.big_rectangle.get_corner(DOWN + RIGHT)
         pixel_coords = self.camera.points_to_pixel_coords(
             np.array([upper_left, lower_right])
         )
         self.zoomed_canvas_pixel_indices = pixel_coords
         (up, left), (down, right) = pixel_coords
         self.zoomed_canvas_pixel_shape = (
-            right-left,            
-            down-up,
+            right - left,
+            down - up,
         )
 
     def setup_zoomed_camera(self):
         self.little_rectangle = self.big_rectangle.copy()
-        self.little_rectangle.scale(1./self.zoom_factor)
+        self.little_rectangle.scale(1. / self.zoom_factor)
         self.little_rectangle.move_to(
             self.little_rectangle_start_position
         )
         self.zoomed_camera = MovingCamera(
             self.little_rectangle,
-            pixel_shape = self.zoomed_canvas_pixel_shape,
-            background = self.zoomed_camera_background
+            pixel_shape=self.zoomed_canvas_pixel_shape,
+            background=self.zoomed_camera_background
         )
         self.add(self.little_rectangle)
-        #TODO, is there a better way to hanld this?
-        self.zoomed_camera.adjusted_thickness = lambda x : x
+        # TODO, is there a better way to hanld this?
+        self.zoomed_camera.adjusted_thickness = lambda x: x
 
     def get_frame(self):
         frame = Scene.get_frame(self)
@@ -102,11 +104,12 @@ class ZoomedScene(Scene):
         self.camera.set_pixel_array(pixel_array)
         if self.zoom_activated:
             (up, left), (down, right) = self.zoomed_canvas_pixel_indices
-            self.zoomed_camera.set_pixel_array(pixel_array[left:right, up:down])
+            self.zoomed_camera.set_pixel_array(
+                pixel_array[left:right, up:down])
 
     def set_camera_background(self, background):
         self.set_camera_pixel_array(self, background)
-        #TODO, check this...
+        # TODO, check this...
 
     def reset_camera(self):
         self.camera.reset()
@@ -122,7 +125,7 @@ class ZoomedScene(Scene):
             self.zoomed_camera.capture_mobjects(
                 mobjects, **kwargs
             )
-            
+
     def get_moving_mobjects(self, *animations):
         moving_mobjects = Scene.get_moving_mobjects(self, *animations)
         if self.zoom_activated and self.little_rectangle in moving_mobjects:
@@ -130,8 +133,3 @@ class ZoomedScene(Scene):
             return self.mobjects
         else:
             return moving_mobjects
-
-
-
-
-
