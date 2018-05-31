@@ -565,7 +565,7 @@ def walker_animation_with_display(
     number_update_func = None,
     show_arrows = True,
     scale_arrows = False,
-    num_decimal_points = 1,
+    num_decimal_places = 1,
     include_background_rectangle = True,
     **kwargs
     ):
@@ -581,7 +581,7 @@ def walker_animation_with_display(
 
     if number_update_func != None:
         display = DecimalNumber(0, 
-            num_decimal_points = num_decimal_points, 
+            num_decimal_places = num_decimal_places, 
             fill_color = WHITE if include_background_rectangle else BLACK,
             include_background_rectangle = include_background_rectangle)
         if include_background_rectangle:
@@ -668,7 +668,7 @@ class ColorMappedByFuncScene(Scene):
         # We hash just based on output image
         # Thus, multiple scenes with same output image can re-use it
         # without recomputation
-        full_hash = hash((func_hash, self.camera.pixel_shape))
+        full_hash = hash((func_hash, self.camera.get_pixel_width()))
         self.background_image_file = self.short_path_to_long_path(
             "color_mapped_bg_hash_" + str(full_hash) + ".png"
         )
@@ -732,7 +732,7 @@ class PiWalker(ColorMappedByFuncScene):
         "show_num_plane" : False,
         "draw_lines" : True,
         "num_checkpoints" : 10,
-        "num_decimal_points" : 1,
+        "num_decimal_places" : 1,
         "include_background_rectangle" : False,
     }
 
@@ -788,7 +788,7 @@ class PiWalker(ColorMappedByFuncScene):
                 number_update_func = number_update_func,
                 run_time = self.step_run_time,
                 walker_stroke_color = WALKER_LIGHT_COLOR if self.color_foreground_not_background else BLACK,
-                num_decimal_points = self.num_decimal_points,
+                num_decimal_places = self.num_decimal_places,
                 include_background_rectangle = self.include_background_rectangle,
             )
 
@@ -2751,7 +2751,7 @@ class OneFifthTwoFifthWinder(SpecifiedWinder):
         "step_size" : 0.01,
         "show_num_plane" : False,
         "step_run_time" : 6,
-        "num_decimal_points" : 2,
+        "num_decimal_places" : 2,
     }
 
 class OneFifthOneFifthWinderWithReset(OneFifthTwoFifthWinder):

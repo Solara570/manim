@@ -559,7 +559,7 @@ class WriteAProgram(Scene):
             rgb = square.fill_rgb
             num = DecimalNumber(
                 square.fill_rgb[0],
-                num_decimal_points = 1
+                num_decimal_places = 1
             )
             num.set_stroke(width = 1)
             color = rgba_to_color(1 - (rgb + 0.2)/1.2)
@@ -1113,7 +1113,7 @@ class IntroduceEachLayer(PreviewMNistNetwork):
         example_num = None
         for neuron in neurons:
             o = neuron.get_fill_opacity()
-            num = DecimalNumber(o, num_decimal_points = 1)
+            num = DecimalNumber(o, num_decimal_places = 1)
             num.scale_to_fit_width(0.7*neuron.get_width())
             num.move_to(neuron)
             if o > 0.8:
@@ -1479,7 +1479,7 @@ class AskAboutLayers(PreviewMNistNetwork):
 
 class BreakUpMacroPatterns(IntroduceEachLayer):
     CONFIG = {
-        "camera_config" : {"background_alpha" : 255},
+        "camera_config" : {"background_opacity" : 1},
         "prefixes" : [
             "nine", "eight", "four",
             "upper_loop", "right_line",
@@ -1868,7 +1868,7 @@ class BreakUpMicroPatterns(BreakUpMacroPatterns):
 class SecondLayerIsLittleEdgeLayer(IntroduceEachLayer):
     CONFIG = {
         "camera_config" : {
-            "background_alpha" : 255,
+            "background_opacity" : 1,
         },
         "network_mob_config" : {
             "layer_to_layer_buff" : 2,
@@ -2081,7 +2081,7 @@ class SecondLayerIsLittleEdgeLayer(IntroduceEachLayer):
 
 class EdgeDetection(Scene):
     CONFIG = {
-        "camera_config" : {"background_alpha" : 255}
+        "camera_config" : {"background_opacity" : 1}
     }
     def construct(self):
         lion = ImageMobject("Lion")

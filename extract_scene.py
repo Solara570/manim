@@ -21,6 +21,7 @@ HELP_MESSAGE = """
    -p preview in low quality
    -s show and save picture of last frame
    -w write result to file [this is default if nothing else is stated]
+   -o <file_name> write to a different file_name
    -l use low quality
    -m use medium quality
    -a run and save every scene in the script, or all args for the given scene
@@ -146,15 +147,16 @@ def handle_scene(scene, **config):
         if (platform.system() == "Linux"):
             commands = ["xdg-open"]
         elif (platform.system() == "Windows"):
-            commands = ["start"]    
+            commands = ["start"]
 
         if config["show_file_in_finder"]:
             commands.append("-R")
-        #
+        
         if config["show_last_frame"]:
             commands.append(scene.get_image_file_path())
         else:
             commands.append(scene.get_movie_file_path())
+        #commands.append("-g")
         FNULL = open(os.devnull, 'w')
         sp.call(commands, stdout=FNULL, stderr=sp.STDOUT)
         FNULL.close()
@@ -238,10 +240,10 @@ def main():
     module = get_module(config["file"])
     scene_names_to_classes = dict(inspect.getmembers(module, is_scene))
 
-    config["output_directory"] = os.path.join(
-        ANIMATIONS_DIR,
-        config["file"].replace(".py", "")
-    )
+    # config["output_directory"] = os.path.join(
+    #     ANIMATIONS_DIR,
+    #     config["file"].replace(".py", "")
+    # )
 
     scene_kwargs = dict([
         (key, config[key])
@@ -250,7 +252,6 @@ def main():
             "frame_duration",
             "skip_animations",
             "write_to_movie",
-            "output_directory",
             "save_pngs",
             "movie_file_extension",
             "start_at_animation_number",

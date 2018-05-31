@@ -2,7 +2,7 @@ import os
 import numpy as np
 
 # Things anyone wishing to use this repository for their
-# own use will want to change this
+# own use will want to change
 MEDIA_DIR = os.path.join(
     os.path.expanduser('~'),
     "Dropbox (3Blue1Brown)/3Blue1Brown Team Folder"
@@ -17,24 +17,26 @@ LOW_QUALITY_FRAME_DURATION = 1. / 15
 MEDIUM_QUALITY_FRAME_DURATION = 1. / 30
 PRODUCTION_QUALITY_FRAME_DURATION = 1. / 60
 
-# There might be other configuration than pixel_shape later...
+# There might be other configuration than pixel shape later...
 PRODUCTION_QUALITY_CAMERA_CONFIG = {
-    "pixel_shape": (DEFAULT_PIXEL_HEIGHT, DEFAULT_PIXEL_WIDTH),
+    "pixel_height": DEFAULT_PIXEL_HEIGHT,
+    "pixel_width": DEFAULT_PIXEL_WIDTH,
 }
 
 MEDIUM_QUALITY_CAMERA_CONFIG = {
-    "pixel_shape": (720, 1280),
+    "pixel_height": 720,
+    "pixel_width": 1280,
 }
 
 LOW_QUALITY_CAMERA_CONFIG = {
-    "pixel_shape": (480, 854),
+    "pixel_height": 480,
+    "pixel_width": 854,
 }
 
 DEFAULT_POINT_DENSITY_2D = 25
 DEFAULT_POINT_DENSITY_1D = 250
 
 DEFAULT_POINT_THICKNESS = 4
-
 
 FRAME_HEIGHT = 8.0
 FRAME_WIDTH = FRAME_HEIGHT * DEFAULT_PIXEL_WIDTH / DEFAULT_PIXEL_HEIGHT

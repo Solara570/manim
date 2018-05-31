@@ -18,7 +18,11 @@ class Histogram(VMobject):
         "y_scale" : 1.0,
         "x_labels" : "auto", # widths, mids, auto, none, [...]
         "y_labels" : "auto", # auto, none, [...]
-        "x_min" : 0
+        "y_label_position" : "top", # "center"
+        "x_min" : 0,
+        "bar_stroke_width" : 5,
+        "outline_stroke_width" : 0,
+        "stroke_color" : WHITE
     }
 
     def __init__(self, x_values, y_values, mode = "widths", **kwargs):
@@ -103,6 +107,8 @@ class Histogram(VMobject):
             self.x_labels = num_arr_to_string_arr(self.widths)
         elif self.x_labels == "mids":
             self.x_labels = num_arr_to_string_arr(self.x_mids)
+        elif self.x_labels == "auto":
+            self.x_labels = num_arr_to_string_arr(self.x_mids)
         elif self.x_labels == "none":
             self.x_labels = empty_string_array(len(self.widths))
 
@@ -119,7 +125,13 @@ class Histogram(VMobject):
             bar = Rectangle(
                 width = self.widths_scaled[i],
                 height = self.y_values_scaled[i],
+                stroke_width = self.bar_stroke_width,
+                stroke_color = self.stroke_color,
             )
+            if bar.height == 0:
+                bar.height = 0.01
+                bar.generate_points()
+
             t = float(x - self.x_min)/(self.x_max - self.x_min)
             bar_color = interpolate_color(
                 self.start_color,
@@ -127,7 +139,6 @@ class Histogram(VMobject):
                 t
             )
             bar.set_fill(color = bar_color, opacity = 1)
-            bar.set_stroke(width = 0)
             bar.next_to(previous_bar,RIGHT,buff = 0, aligned_edge = DOWN)
             
             self.bars.add(bar)
@@ -137,7 +148,12 @@ class Histogram(VMobject):
             self.x_labels_group.add(x_label)
 
             y_label = TextMobject(self.y_labels[i])
-            y_label.next_to(bar, UP)
+            if self.y_label_position == "top":
+                y_label.next_to(bar, UP)
+            elif self.y_label_position == "center":
+                y_label.move_to(bar)
+            else:
+                raise Exception("y_label_position must be top or center")
             self.y_labels_group.add(y_label)
 
             if i == 0:
@@ -155,11 +171,12 @@ class Histogram(VMobject):
             # lower left
         outline_points.append(outline_points[0])
 
-        self.outline = Polygon(*outline_points)
-        self.outline.set_stroke(color = WHITE)
+        self.outline = Polygon(*outline_points,
+            stroke_width = self.outline_stroke_width,
+            stroke_color = self.stroke_color)
         self.add(self.bars, self.x_labels_group, self.y_labels_group, self.outline)
 
-        print self.submobjects
+        self.move_to(ORIGIN)
 
     def get_lower_left_point(self):
         return self.bars[0].get_anchors()[-2]
@@ -184,7 +201,10 @@ class FlashThroughHistogram(Animation):
         "hist_opacity" : 0.2
     }
 
-    def __init__(self, mobject, direction = "horizontal", mode = "random", **kwargs):
+    def __init__(self, mobject,
+        direction = "horizontal",
+        mode = "random",
+        **kwargs):
 
         digest_config(self, kwargs)
 
@@ -213,7 +233,7 @@ class FlashThroughHistogram(Animation):
         self.cell_indices = []
         for (i,x) in enumerate(x_values):
 
-            nb_cells = y_values[i]
+            nb_cells = int(np.floor(y_values[i]))
             for j in range(nb_cells):
                 self.cell_indices.append((i, j))
 
@@ -256,68 +276,65 @@ class FlashThroughHistogram(Animation):
         self.prototype_cell.generate_points()
         self.prototype_cell.move_to(cell.get_center())
 
-        #if t == 1:
-        #   self.mobject.remove(self.prototype_cell)
+        if t == 1:
+           self.mobject.remove(self.prototype_cell)
+
+
+    def clean_up(self, surrounding_scene = None):
+        Animation.clean_up(self, surrounding_scene)
+        self.update(1)
+        if surrounding_scene is not None:
+            if self.is_remover():
+                surrounding_scene.remove(self.prototype_cell)
+            else:
+                surrounding_scene.add(self.prototype_cell)
+        return self
 
 
 
+class OutlineableBars(VGroup):
+
+    # A group of bars (rectangles), together with
+    # a method that draws an outline around them,
+    # assuming the bars are arranged in a histogram
+    # (aligned at the bottom without gaps).
+
+    # We use this to morph a row of bricks into a histogram.
+
+    CONFIG = {
+        "outline_stroke_width" : 3,
+        "stroke_color" : WHITE
+    }
+    def create_outline(self, animated = False, **kwargs):
+
+        outline_points = []
+
+        for (i, bar) in enumerate(self.submobjects):
+            
+            if i == 0:
+                # start with the lower left
+                outline_points.append(bar.get_corner(DOWN + LEFT))
+
+            # upper two points of each bar
+            outline_points.append(bar.get_corner(UP + LEFT))
+            outline_points.append(bar.get_corner(UP + RIGHT))
+
+            previous_bar = bar
+        # close the outline
+            # lower right
+        outline_points.append(previous_bar.get_corner(DOWN + RIGHT))
+            # lower left
+        outline_points.append(outline_points[0])
+
+        self.outline = Polygon(*outline_points,
+            stroke_width = self.outline_stroke_width,
+            stroke_color = self.stroke_color)
+
+        if animated:
+            self.play(FadeIn(self.outline, **kwargs))
+        return self.outline
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-class SampleScene(Scene):
-
-    def construct(self):
-
-        x_values = np.array([1,2,3,4,5])
-        y_values = np.array([4,3,5,2,3])
-
-        hist1 = Histogram(
-            x_values = x_values,
-            y_values = y_values,
-            x_scale = 0.5,
-            y_scale = 0.5,
-        ).shift(1*DOWN)
-        self.add(hist1)
-        self.wait()
-
-        y_values2 = np.array([3,8,7,15,5])
-
-        hist2 = Histogram(
-            x_values = x_values,
-            y_values = y_values2,
-            x_scale = 0.5,
-            y_scale = 0.5,
-            x_labels = text_range(1,6,1),
-        )
-
-        v1 = hist1.get_lower_left_point()
-        v2 = hist2.get_lower_left_point()
-        hist2.shift(v1 - v2)
-        
-        # self.play(
-        #   ReplacementTransform(hist1,hist2)
-        # )
-
-        self.play(
-            FlashThroughHistogram(
-                hist1,
-                direction = "horizontal",
-                mode = "linear",
-                run_time = 10,
-                rate_func = None,
-            )
-        )
 
 
 
