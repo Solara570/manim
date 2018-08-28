@@ -1,11 +1,7 @@
-from __future__ import absolute_import
-
 from constants import *
-import operator as op
 
 from mobject.svg.tex_mobject import SingleStringTexMobject
 from mobject.types.vectorized_mobject import VMobject
-from functools import reduce
 
 
 class DecimalNumber(VMobject):
@@ -17,12 +13,13 @@ class DecimalNumber(VMobject):
         "show_ellipsis": False,
         "unit": None,  # Aligned to bottom unless it starts with "^"
         "include_background_rectangle": False,
+        "edge_to_fix": LEFT,
     }
 
     def __init__(self, number, **kwargs):
         VMobject.__init__(self, **kwargs)
-        # TODO, make this more ediable with a getter and setter
         self.number = number
+        self.initial_config = kwargs
 
         if isinstance(number, complex):
             formatter = self.get_complex_formatter()
@@ -30,7 +27,8 @@ class DecimalNumber(VMobject):
             formatter = self.get_formatter()
         num_string = formatter.format(number)
 
-        if num_string.startswith("-") and number == 0:
+        shows_zero = np.round(number, self.num_decimal_places) == 0
+        if num_string.startswith("-") and shows_zero:
             num_string = num_string[1:]
 
         self.add(*[
@@ -83,7 +81,7 @@ class DecimalNumber(VMobject):
         """
         config = dict(self.__dict__)
         config.update(kwargs)
-        return reduce(op.add, [
+        return "".join([
             "{",
             config.get("field_name", ""),
             ":",
@@ -94,7 +92,31 @@ class DecimalNumber(VMobject):
         ])
 
     def get_complex_formatter(self, **kwargs):
-        pass
+        return "".join([
+            self.get_formatter(field_name="0.real"),
+            self.get_formatter(field_name="0.imag", include_sign=True),
+            "i"
+        ])
+
+    def set_value(self, number, **config):
+        full_config = dict(self.CONFIG)
+        full_config.update(self.initial_config)
+        full_config.update(config)
+        new_decimal = DecimalNumber(number, **full_config)
+        new_decimal.match_height(self)
+        new_decimal.move_to(self, self.edge_to_fix)
+        new_decimal.match_style(self)
+
+        old_family = self.get_family()
+        self.submobjects = new_decimal.submobjects
+        for mob in old_family:
+            # Dumb hack...due to how scene handles families
+            # of animated mobjects
+            mob.points[:] = 0
+        self.number = number
+
+    def get_value(self):
+        return self.number
 
 
 class Integer(DecimalNumber):

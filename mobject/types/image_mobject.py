@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+
 
 import numpy as np
 
@@ -30,7 +30,7 @@ class AbstractImageMobject(Mobject):
         # Likely to be implemented in subclasses, but no obgligation
         pass
 
-    def init_points(self):
+    def reset_points(self):
         # Corresponding corners of image are fixed to these 3 points
         self.points = np.array([
             UP + LEFT,

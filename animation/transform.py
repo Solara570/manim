@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+
 
 import inspect
 import numpy as np
@@ -77,6 +77,13 @@ class ReplacementTransform(Transform):
     CONFIG = {
         "replace_mobject_with_target_in_scene": True,
     }
+
+
+class TransformFromCopy(ReplacementTransform):
+    def __init__(self, mobject, target_mobject, **kwargs):
+        ReplacementTransform.__init__(
+            self, mobject.deepcopy(), target_mobject, **kwargs
+        )
 
 
 class ClockwiseTransform(Transform):

@@ -1,7 +1,8 @@
 import numpy as np
 
 from scipy import linalg
-from utils.simple_functions import choose
+from utils.simple_functions import choose_using_cache
+from utils.space_ops import get_norm
 
 CLOSED_THRESHOLD = 0.001
 
@@ -9,7 +10,7 @@ CLOSED_THRESHOLD = 0.001
 def bezier(points):
     n = len(points) - 1
     return lambda t: sum([
-        ((1 - t)**(n - k)) * (t**k) * choose(n, k) * point
+        ((1 - t)**(n - k)) * (t**k) * choose_using_cache(n, k) * point
         for k, point in enumerate(points)
     ])
 
@@ -133,4 +134,4 @@ def diag_to_matrix(l_and_u, diag):
 
 
 def is_closed(points):
-    return np.linalg.norm(points[0] - points[-1]) < CLOSED_THRESHOLD
+    return get_norm(points[0] - points[-1]) < CLOSED_THRESHOLD
