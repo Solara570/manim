@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+
 
 from constants import *
 import itertools as it
@@ -50,8 +50,8 @@ class GraphScene(Scene):
         "default_input_color": YELLOW,
         "default_riemann_start_color": BLUE,
         "default_riemann_end_color": GREEN,
-        "area_opacity" : 0.8,
-        "num_rects" : 50,
+        "area_opacity": 0.8,
+        "num_rects": 50,
     }
 
     def setup(self):
@@ -82,10 +82,7 @@ class GraphScene(Scene):
         x_axis.shift(self.graph_origin - x_axis.number_to_point(0))
         if len(self.x_labeled_nums) > 0:
             if self.exclude_zero_label:
-                self.x_labeled_nums = filter(
-                    lambda x: x != 0,
-                    self.x_labeled_nums
-                )
+                self.x_labeled_nums = [x for x in self.x_labeled_nums if x != 0]
             x_axis.add_numbers(*self.x_labeled_nums)
         if self.x_axis_label:
             x_label = TextMobject(self.x_axis_label)
@@ -118,10 +115,7 @@ class GraphScene(Scene):
         y_axis.rotate(np.pi / 2, about_point=y_axis.number_to_point(0))
         if len(self.y_labeled_nums) > 0:
             if self.exclude_zero_label:
-                self.y_labeled_nums = filter(
-                    lambda y: y != 0,
-                    self.y_labeled_nums
-                )
+                self.y_labeled_nums = [y for y in self.y_labeled_nums if y != 0]
             y_axis.add_numbers(*self.y_labeled_nums)
         if self.y_axis_label:
             y_label = TextMobject(self.y_axis_label)
@@ -157,7 +151,7 @@ class GraphScene(Scene):
         x_max=None,
     ):
         if color is None:
-            color = self.default_graph_colors_cycle.next()
+            color = next(self.default_graph_colors_cycle)
         if x_min is None:
             x_min = self.x_min
         if x_max is None:
@@ -258,11 +252,11 @@ class GraphScene(Scene):
             else:
                 raise Exception("Invalid input sample type")
             graph_point = self.input_to_graph_point(sample_input, graph)
-            points = VGroup(*map(VectorizedPoint, [
+            points = VGroup(*list(map(VectorizedPoint, [
                 self.coords_to_point(x, 0),
                 self.coords_to_point(x + width_scale_factor * dx, 0),
                 graph_point
-            ]))
+            ])))
 
             rect = Rectangle()
             rect.replace(points, stretch=True)
@@ -294,17 +288,16 @@ class GraphScene(Scene):
             for n in range(n_iterations)
         ]
 
-
     def get_area(self, graph, t_min, t_max):
         numerator = max(t_max - t_min, 0.0001)
         dx = float(numerator) / self.num_rects
         return self.get_riemann_rectangles(
             graph,
-            x_min = t_min,
-            x_max = t_max,
-            dx = dx,
-            stroke_width = 0,
-        ).set_fill(opacity = self.area_opacity)
+            x_min=t_min,
+            x_max=t_max,
+            dx=dx,
+            stroke_width=0,
+        ).set_fill(opacity=self.area_opacity)
 
     def transform_between_riemann_rects(self, curr_rects, new_rects, **kwargs):
         transform_kwargs = {
@@ -413,9 +406,9 @@ class GraphScene(Scene):
             max_width = 0.8 * group.dx_line.get_width()
             max_height = 0.8 * group.df_line.get_height()
             if labels.get_width() > max_width:
-                labels.scale_to_fit_width(max_width)
+                labels.set_width(max_width)
             if labels.get_height() > max_height:
-                labels.scale_to_fit_height(max_height)
+                labels.set_height(max_height)
 
         if dx_label is not None:
             group.dx_label.next_to(
@@ -443,29 +436,28 @@ class GraphScene(Scene):
 
         return group
 
-
-    def add_T_label(self, x_val, side = RIGHT, label = None, color = WHITE, animated = False, **kwargs):
-        triangle = RegularPolygon(n=3, start_angle = np.pi/2)
-        triangle.scale_to_fit_height(MED_SMALL_BUFF)
+    def add_T_label(self, x_val, side=RIGHT, label=None, color=WHITE, animated=False, **kwargs):
+        triangle = RegularPolygon(n=3, start_angle=np.pi / 2)
+        triangle.set_height(MED_SMALL_BUFF)
         triangle.move_to(self.coords_to_point(x_val, 0), UP)
         triangle.set_fill(color, 1)
-        triangle.set_stroke(width = 0)
+        triangle.set_stroke(width=0)
         if label == None:
-            T_label = TexMobject(self.variable_point_label, fill_color = color)
+            T_label = TexMobject(self.variable_point_label, fill_color=color)
         else:
-            T_label = TexMobject(label, fill_color = color)
-        
+            T_label = TexMobject(label, fill_color=color)
+
         T_label.next_to(triangle, DOWN)
         v_line = self.get_vertical_line_to_graph(
             x_val, self.v_graph,
-            color = YELLOW
+            color=YELLOW
         )
 
         if animated:
             self.play(
                 DrawBorderThenFill(triangle),
                 ShowCreation(v_line),
-                Write(T_label, run_time = 1),
+                Write(T_label, run_time=1),
                 **kwargs
             )
 
@@ -478,16 +470,13 @@ class GraphScene(Scene):
             self.right_v_line = v_line
             self.add(self.right_T_label_group, self.right_v_line)
 
-
-
-
     def get_animation_integral_bounds_change(
         self,
         graph,
         new_t_min,
         new_t_max,
-        fade_close_to_origin = True,
-        run_time = 1.0
+        fade_close_to_origin=True,
+        run_time=1.0
     ):
         curr_t_min = self.x_axis.point_to_number(self.area.get_left())
         curr_t_max = self.x_axis.point_to_number(self.area.get_right())
@@ -506,8 +495,8 @@ class GraphScene(Scene):
             area, left_v_line, left_T_label, right_v_line, right_T_label = group
             t_min = interpolate(curr_t_min, new_t_min, alpha)
             t_max = interpolate(curr_t_max, new_t_max, alpha)
-            new_area = self.get_area(graph,t_min, t_max)
-            
+            new_area = self.get_area(graph, t_min, t_max)
+
             new_left_v_line = self.get_vertical_line_to_graph(
                 t_min, graph
             )
@@ -523,19 +512,16 @@ class GraphScene(Scene):
             # Fade close to 0
             if fade_close_to_origin:
                 if len(left_T_label) > 0:
-                    left_T_label[0].set_fill(opacity = min(1, np.abs(t_min))) 
+                    left_T_label[0].set_fill(opacity=min(1, np.abs(t_min)))
                 if len(right_T_label) > 0:
-                    right_T_label[0].set_fill(opacity = min(1, np.abs(t_max))) 
+                    right_T_label[0].set_fill(opacity=min(1, np.abs(t_max)))
 
             Transform(area, new_area).update(1)
             Transform(left_v_line, new_left_v_line).update(1)
             Transform(right_v_line, new_right_v_line).update(1)
             return group
 
-        return UpdateFromAlphaFunc(group, update_group, run_time = run_time)
-
-
-
+        return UpdateFromAlphaFunc(group, update_group, run_time=run_time)
 
     def animate_secant_slope_group_change(
         self, secant_slope_group,
@@ -578,23 +564,3 @@ class GraphScene(Scene):
         )
         secant_slope_group.kwargs["x"] = target_x
         secant_slope_group.kwargs["dx"] = target_dx
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

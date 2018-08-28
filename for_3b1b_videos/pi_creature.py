@@ -15,6 +15,7 @@ from animation.transform import Transform
 from utils.config_ops import digest_config
 from utils.rate_functions import squish_rate_func
 from utils.rate_functions import there_and_back
+from utils.space_ops import get_norm
 
 PI_CREATURE_DIR = os.path.join(MEDIA_DIR, "designs", "PiCreature")
 PI_CREATURE_SCALE_FACTOR = 0.5
@@ -47,6 +48,7 @@ class PiCreature(SVGMobject):
 
     def __init__(self, mode="plain", **kwargs):
         digest_config(self, kwargs)
+        self.mode = mode
         self.parts_named = False
         try:
             svg_file = os.path.join(
@@ -67,6 +69,13 @@ class PiCreature(SVGMobject):
             self.flip()
         if self.start_corner is not None:
             self.to_corner(self.start_corner)
+
+    def align_data(self, mobject):
+        # This ensures that after a transform into a different mode,
+        # the pi creatures mode will be updated appropriately
+        SVGMobject.align_data(self, mobject)
+        if isinstance(mobject, PiCreature):
+            self.mode = mobject.get_mode()
 
     def name_parts(self):
         self.mouth = self.submobjects[MOUTH_INDEX]
@@ -89,8 +98,23 @@ class PiCreature(SVGMobject):
         self.mouth.set_fill(BLACK, opacity=1)
         self.body.set_fill(self.color, opacity=1)
         self.pupils.set_fill(BLACK, opacity=1)
+        # self.pupils.set_stroke(DARK_GREY, width=1)
+        self.add_pupil_light_spot(self.pupils)
         self.eyes.set_fill(WHITE, opacity=1)
         return self
+
+    def add_pupil_light_spot(self, pupils):
+        # Purely an artifact of how the SVGs were drawn.
+        # In a perfect world, this wouldn't be needed
+        for pupil in pupils:
+            index = 16
+            sub_points = pupil.points[:index]
+            pupil.points = pupil.points[index + 2:]
+            circle = VMobject()
+            circle.points = sub_points
+            circle.set_stroke(width=0)
+            circle.set_fill(WHITE, 1)
+            pupil.add(circle)
 
     def copy(self):
         copy_mobject = SVGMobject.copy(self)
@@ -104,38 +128,38 @@ class PiCreature(SVGMobject):
 
     def change_mode(self, mode):
         new_self = self.__class__(
-            mode = mode,
+            mode=mode,
         )
         new_self.match_style(self)
         new_self.match_height(self)
-        if self.is_flipped() ^ new_self.is_flipped():
+        if self.is_flipped() != new_self.is_flipped():
             new_self.flip()
         new_self.shift(self.eyes.get_center() - new_self.eyes.get_center())
         if hasattr(self, "purposeful_looking_direction"):
             new_self.look(self.purposeful_looking_direction)
         Transform(self, new_self).update(1)
+        self.mode = mode
         return self
 
+    def get_mode(self):
+        return self.mode
+
     def look(self, direction):
-        norm = np.linalg.norm(direction)
+        norm = get_norm(direction)
         if norm == 0:
             return
         direction /= norm
         self.purposeful_looking_direction = direction
         for pupil, eye in zip(self.pupils.split(), self.eyes.split()):
-            pupil_radius = pupil.get_width() / 2.
-            eye_radius = eye.get_width() / 2.
-            pupil.move_to(eye)
-            if direction[1] < 0:
-                pupil.shift(pupil_radius * DOWN / 3)
-            pupil.shift(direction * (eye_radius - pupil_radius))
-            bottom_diff = eye.get_bottom()[1] - pupil.get_bottom()[1]
-            if bottom_diff > 0:
-                pupil.shift(bottom_diff * UP)
-            # TODO, how to handle looking up...
-            # top_diff = eye.get_top()[1]-pupil.get_top()[1]
-            # if top_diff < 0:
-            #     pupil.shift(top_diff*UP)
+            c = eye.get_center()
+            right = eye.get_right() - c
+            up = eye.get_top() - c
+            vect = direction[0] * right + direction[1] * up
+            v_norm = get_norm(vect)
+            p_radius = 0.5 * pupil.get_width()
+            vect *= (v_norm - 0.75 * p_radius) / v_norm
+            pupil.move_to(c + vect)
+        self.pupils[1].align_to(self.pupils[0], DOWN)
         return self
 
     def look_at(self, point_or_mobject):
@@ -211,7 +235,7 @@ class PiCreature(SVGMobject):
         body = self.body
         return VGroup(*[
             body.copy().pointwise_become_partial(body, *alpha_range)
-            for alpha_range in self.right_arm_range, self.left_arm_range
+            for alpha_range in (self.right_arm_range, self.left_arm_range)
         ])
 
 
@@ -281,49 +305,63 @@ class ThreeLeggedPiCreature(PiCreature):
 class Eyes(VMobject):
     CONFIG = {
         "height": 0.3,
-        "thing_looked_at": None,
+        "thing_to_look_at": None,
         "mode": "plain",
     }
 
-    def __init__(self, mobject, **kwargs):
+    def __init__(self, body, **kwargs):
         VMobject.__init__(self, **kwargs)
-        self.mobject = mobject
-        self.submobjects = self.get_eyes().submobjects
+        self.body = body
+        eyes = self.create_eyes()
+        self.become(eyes, copy_submobjects=False)
 
-    def get_eyes(self, mode=None, thing_to_look_at=None):
-        mode = mode or self.mode
+    def create_eyes(self, mode=None, thing_to_look_at=None):
+        if mode is None:
+            mode = self.mode
         if thing_to_look_at is None:
-            thing_to_look_at = self.thing_looked_at
+            thing_to_look_at = self.thing_to_look_at
+        self.thing_to_look_at = thing_to_look_at
+        self.mode = mode
+        looking_direction = None
 
-        pi = Randolph(mode=mode)
+        pi = PiCreature(mode=mode)
         eyes = VGroup(pi.eyes, pi.pupils)
-        pi.scale(self.height / eyes.get_height())
         if self.submobjects:
+            eyes.match_height(self)
             eyes.move_to(self, DOWN)
+            looking_direction = self[1].get_center() - self[0].get_center()
         else:
-            eyes.move_to(self.mobject.get_top(), DOWN)
+            eyes.set_height(self.height)
+            eyes.move_to(self.body.get_top(), DOWN)
+
+        height = eyes.get_height()
         if thing_to_look_at is not None:
             pi.look_at(thing_to_look_at)
+        elif looking_direction is not None:
+            pi.look(looking_direction)
+        eyes.set_height(height)
+
         return eyes
 
-    def change_mode_anim(self, mode, **kwargs):
-        self.mode = mode
-        return Transform(self, self.get_eyes(mode=mode), **kwargs)
-
-    def look_at_anim(self, point_or_mobject, **kwargs):
-        self.thing_looked_at = point_or_mobject
-        return Transform(
-            self, self.get_eyes(thing_to_look_at=point_or_mobject),
-            **kwargs
+    def change_mode(self, mode, thing_to_look_at=None):
+        new_eyes = self.create_eyes(
+            mode=mode,
+            thing_to_look_at=thing_to_look_at
         )
+        self.become(new_eyes, copy_submobjects=False)
+        return self
 
-    def blink_anim(self, **kwargs):
-        target = self.copy()
+    def look_at(self, thing_to_look_at):
+        self.change_mode(
+            self.mode,
+            thing_to_look_at=thing_to_look_at
+        )
+        return self
+
+    def blink(self, **kwargs):  # TODO, change Blink
         bottom_y = self.get_bottom()[1]
-        for submob in target:
+        for submob in self:
             submob.apply_function(
                 lambda p: [p[0], bottom_y, p[2]]
             )
-        if "rate_func" not in kwargs:
-            kwargs["rate_func"] = squish_rate_func(there_and_back)
-        return Transform(self, target, **kwargs)
+        return self

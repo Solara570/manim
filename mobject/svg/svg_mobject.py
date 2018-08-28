@@ -103,7 +103,7 @@ class SVGMobject(VMobject):
         else:
             pass  # TODO
             # warnings.warn("Unknown element type: " + element.tagName)
-        result = filter(lambda m: m is not None, result)
+        result = [m for m in result if m is not None]
         self.handle_transforms(element, VMobject(*result))
         if len(result) > 1 and not self.unpack_groups:
             result = [VGroup(*result)]
@@ -143,7 +143,7 @@ class SVGMobject(VMobject):
             float(circle_element.getAttribute(key))
             if circle_element.hasAttribute(key)
             else 0.0
-            for key in "cx", "cy", "r"
+            for key in ("cx", "cy", "r")
         ]
         return Circle(radius=r).shift(x * RIGHT + y * DOWN)
 
@@ -152,7 +152,7 @@ class SVGMobject(VMobject):
             float(circle_element.getAttribute(key))
             if circle_element.hasAttribute(key)
             else 0.0
-            for key in "cx", "cy", "rx", "ry"
+            for key in ("cx", "cy", "rx", "ry")
         ]
         return Circle().scale(rx * RIGHT + ry * UP).shift(x * RIGHT + y * DOWN)
 
@@ -272,9 +272,9 @@ class SVGMobject(VMobject):
         if self.should_center:
             self.center()
         if self.height is not None:
-            self.scale_to_fit_height(self.height)
+            self.set_height(self.height)
         if self.width is not None:
-            self.scale_to_fit_width(self.width)
+            self.set_width(self.width)
 
 
 class VMobjectFromSVGPathstring(VMobject):
@@ -295,15 +295,15 @@ class VMobjectFromSVGPathstring(VMobject):
             "A",  # elliptical Arc
             "Z",  # closepath
         ]
-        result += map(lambda s: s.lower(), result)
+        result += [s.lower() for s in result]
         return result
 
     def generate_points(self):
         pattern = "[%s]" % ("".join(self.get_path_commands()))
-        pairs = zip(
+        pairs = list(zip(
             re.findall(pattern, self.path_string),
             re.split(pattern, self.path_string)[1:]
-        )
+        ))
         # Which mobject should new points be added to
         self.growing_path = self
         for command, coord_string in pairs:
@@ -375,7 +375,7 @@ class VMobjectFromSVGPathstring(VMobject):
         numbers = string_to_numbers(coord_string)
         if len(numbers) % 2 == 1:
             numbers.append(0)
-        num_points = len(numbers) / 2
+        num_points = len(numbers) // 2
         result = np.zeros((num_points, self.dim))
         result[:, :2] = np.array(numbers).reshape((num_points, 2))
         return result

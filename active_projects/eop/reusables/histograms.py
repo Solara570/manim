@@ -107,6 +107,8 @@ class Histogram(VMobject):
             self.x_labels = num_arr_to_string_arr(self.widths)
         elif self.x_labels == "mids":
             self.x_labels = num_arr_to_string_arr(self.x_mids)
+        elif self.x_labels == "auto":
+            self.x_labels = num_arr_to_string_arr(self.x_mids)
         elif self.x_labels == "none":
             self.x_labels = empty_string_array(len(self.widths))
 
@@ -199,7 +201,10 @@ class FlashThroughHistogram(Animation):
         "hist_opacity" : 0.2
     }
 
-    def __init__(self, mobject, direction = "horizontal", mode = "random", **kwargs):
+    def __init__(self, mobject,
+        direction = "horizontal",
+        mode = "random",
+        **kwargs):
 
         digest_config(self, kwargs)
 
@@ -228,7 +233,7 @@ class FlashThroughHistogram(Animation):
         self.cell_indices = []
         for (i,x) in enumerate(x_values):
 
-            nb_cells = y_values[i]
+            nb_cells = int(np.floor(y_values[i]))
             for j in range(nb_cells):
                 self.cell_indices.append((i, j))
 
@@ -271,11 +276,63 @@ class FlashThroughHistogram(Animation):
         self.prototype_cell.generate_points()
         self.prototype_cell.move_to(cell.get_center())
 
-        #if t == 1:
-        #   self.mobject.remove(self.prototype_cell)
+        if t == 1:
+           self.mobject.remove(self.prototype_cell)
+
+
+    def clean_up(self, surrounding_scene = None):
+        Animation.clean_up(self, surrounding_scene)
+        self.update(1)
+        if surrounding_scene is not None:
+            if self.is_remover():
+                surrounding_scene.remove(self.prototype_cell)
+            else:
+                surrounding_scene.add(self.prototype_cell)
+        return self
 
 
 
+class OutlineableBars(VGroup):
+
+    # A group of bars (rectangles), together with
+    # a method that draws an outline around them,
+    # assuming the bars are arranged in a histogram
+    # (aligned at the bottom without gaps).
+
+    # We use this to morph a row of bricks into a histogram.
+
+    CONFIG = {
+        "outline_stroke_width" : 3,
+        "stroke_color" : WHITE
+    }
+    def create_outline(self, animated = False, **kwargs):
+
+        outline_points = []
+
+        for (i, bar) in enumerate(self.submobjects):
+            
+            if i == 0:
+                # start with the lower left
+                outline_points.append(bar.get_corner(DOWN + LEFT))
+
+            # upper two points of each bar
+            outline_points.append(bar.get_corner(UP + LEFT))
+            outline_points.append(bar.get_corner(UP + RIGHT))
+
+            previous_bar = bar
+        # close the outline
+            # lower right
+        outline_points.append(previous_bar.get_corner(DOWN + RIGHT))
+            # lower left
+        outline_points.append(outline_points[0])
+
+        self.outline = Polygon(*outline_points,
+            stroke_width = self.outline_stroke_width,
+            stroke_color = self.stroke_color)
+
+        if animated:
+            self.play(FadeIn(self.outline, **kwargs))
+        return self.outline
 
 
 

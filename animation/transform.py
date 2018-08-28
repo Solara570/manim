@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+
 
 import inspect
 import numpy as np
@@ -79,6 +79,13 @@ class ReplacementTransform(Transform):
     }
 
 
+class TransformFromCopy(ReplacementTransform):
+    def __init__(self, mobject, target_mobject, **kwargs):
+        ReplacementTransform.__init__(
+            self, mobject.deepcopy(), target_mobject, **kwargs
+        )
+
+
 class ClockwiseTransform(Transform):
     CONFIG = {
         "path_arc": -np.pi
@@ -116,7 +123,7 @@ class ApplyMethod(Transform):
                 "Whoops, looks like you accidentally invoked " +
                 "the method you want to animate"
             )
-        assert(isinstance(method.im_self, Mobject))
+        assert(isinstance(method.__self__, Mobject))
         args = list(args)  # So that args.pop() works
         if "method_kwargs" in kwargs:
             method_kwargs = kwargs["method_kwargs"]
@@ -124,9 +131,9 @@ class ApplyMethod(Transform):
             method_kwargs = args.pop()
         else:
             method_kwargs = {}
-        target = method.im_self.copy()
-        method.im_func(target, *args, **method_kwargs)
-        Transform.__init__(self, method.im_self, target, **kwargs)
+        target = method.__self__.copy()
+        method.__func__(target, *args, **method_kwargs)
+        Transform.__init__(self, method.__self__, target, **kwargs)
 
 
 class ApplyPointwiseFunction(ApplyMethod):
@@ -140,6 +147,13 @@ class ApplyPointwiseFunction(ApplyMethod):
         )
 
 
+class ApplyPointwiseFunctionToCenter(ApplyPointwiseFunction):
+    def __init__(self, function, mobject, **kwargs):
+        ApplyMethod.__init__(
+            self, mobject.move_to, function(mobject.get_center()), **kwargs
+        )
+
+
 class FadeToColor(ApplyMethod):
     def __init__(self, mobject, color, **kwargs):
         ApplyMethod.__init__(self, mobject.set_color, color, **kwargs)
@@ -149,6 +163,11 @@ class ScaleInPlace(ApplyMethod):
     def __init__(self, mobject, scale_factor, **kwargs):
         ApplyMethod.__init__(self, mobject.scale_in_place,
                              scale_factor, **kwargs)
+
+
+class Restore(ApplyMethod):
+    def __init__(self, mobject, **kwargs):
+        ApplyMethod.__init__(self, mobject.restore, **kwargs)
 
 
 class ApplyFunction(Transform):
@@ -175,7 +194,7 @@ class ApplyMatrix(ApplyPointwiseFunction):
             new_matrix[:2, :2] = matrix
             matrix = new_matrix
         elif matrix.shape != (3, 3):
-            raise "Matrix has bad dimensions"
+            raise Exception("Matrix has bad dimensions")
         transpose = np.transpose(matrix)
 
         def func(p):
@@ -191,7 +210,7 @@ class ComplexFunction(ApplyPointwiseFunction):
             )
         ApplyPointwiseFunction.__init__(
             self,
-            lambda (x, y, z): complex_to_R3(function(complex(x, y))),
+            lambda x_y_z: complex_to_R3(function(complex(x_y_z[0], x_y_z[1]))),
             instantiate(mobject),
             **kwargs
         )

@@ -1,8 +1,9 @@
-#!/usr/bin/env python2
+# !/usr/bin/env python2
 
 import sys
 import argparse
-import imp
+# import imp
+import importlib
 import inspect
 import itertools as it
 import os
@@ -21,12 +22,15 @@ HELP_MESSAGE = """
    -p preview in low quality
    -s show and save picture of last frame
    -w write result to file [this is default if nothing else is stated]
+   -o <file_name> write to a different file_name
    -l use low quality
    -m use medium quality
    -a run and save every scene in the script, or all args for the given scene
    -q don't print progress
    -f when writing to a movie file, export the frames in png sequence
    -t use transperency when exporting images
+   -n specify the number of the animation to start from
+   -r specify a resolution
 """
 SCENE_NOT_FOUND_MESSAGE = """
    That scene is not in the script
@@ -67,13 +71,15 @@ def get_configuration():
             parser.add_argument(short_arg, long_arg, action="store_true")
         parser.add_argument("-o", "--output_name")
         parser.add_argument("-n", "--start_at_animation_number")
+        parser.add_argument("-r", "--resolution")
         args = parser.parse_args()
         if args.output_name is not None:
             output_name_root, output_name_ext = os.path.splitext(
                 args.output_name)
             expected_ext = '.png' if args.show_last_frame else '.mp4'
             if output_name_ext not in ['', expected_ext]:
-                print "WARNING: The output will be to (doubly-dotted) %s%s" % output_name_root % expected_ext
+                print("WARNING: The output will be to (doubly-dotted) %s%s" %
+                      output_name_root % expected_ext)
                 output_name = args.output_name
             else:
                 # If anyone wants .mp4.mp4 and is surprised to only get .mp4, or such... Well, too bad.
@@ -102,16 +108,39 @@ def get_configuration():
         "start_at_animation_number": args.start_at_animation_number,
         "end_at_animation_number": None,
     }
+
+    # Camera configuration
+    config["camera_config"] = {}
     if args.low_quality:
-        config["camera_config"] = LOW_QUALITY_CAMERA_CONFIG
+        config["camera_config"].update(LOW_QUALITY_CAMERA_CONFIG)
         config["frame_duration"] = LOW_QUALITY_FRAME_DURATION
     elif args.medium_quality:
-        config["camera_config"] = MEDIUM_QUALITY_CAMERA_CONFIG
+        config["camera_config"].update(MEDIUM_QUALITY_CAMERA_CONFIG)
         config["frame_duration"] = MEDIUM_QUALITY_FRAME_DURATION
     else:
-        config["camera_config"] = PRODUCTION_QUALITY_CAMERA_CONFIG
+        config["camera_config"].update(PRODUCTION_QUALITY_CAMERA_CONFIG)
         config["frame_duration"] = PRODUCTION_QUALITY_FRAME_DURATION
 
+    # If the resolution was passed in via -r
+    if args.resolution:
+        if "," in args.resolution:
+            height_str, width_str = args.resolution.split(",")
+            height = int(height_str)
+            width = int(width_str)
+        else:
+            height = int(args.resolution)
+            width = int(16 * height / 9)
+        config["camera_config"].update({
+            "pixel_height": height,
+            "pixel_width": width,
+        })
+
+    # If rendering a transparent image/move, make sure the
+    # scene has a background opacity of 0
+    if args.transparent:
+        config["camera_config"]["background_opacity"] = 0
+
+    # Arguments related to skipping
     stan = config["start_at_animation_number"]
     if stan is not None:
         if "," in stan:
@@ -146,15 +175,16 @@ def handle_scene(scene, **config):
         if (platform.system() == "Linux"):
             commands = ["xdg-open"]
         elif (platform.system() == "Windows"):
-            commands = ["start"]    
+            commands = ["start"]
 
         if config["show_file_in_finder"]:
             commands.append("-R")
-        #
+
         if config["show_last_frame"]:
             commands.append(scene.get_image_file_path())
         else:
             commands.append(scene.get_movie_file_path())
+        # commands.append("-g")
         FNULL = open(os.devnull, 'w')
         sp.call(commands, stdout=FNULL, stderr=sp.STDOUT)
         FNULL.close()
@@ -181,7 +211,7 @@ def prompt_user_for_choice(name_to_obj):
         print("%d: %s" % (count, name))
         num_to_name[count] = name
     try:
-        user_input = raw_input(CHOOSE_NUMBER_MESSAGE)
+        user_input = input(CHOOSE_NUMBER_MESSAGE)
         return [
             name_to_obj[num_to_name[int(num_str)]]
             for num_str in user_input.split(",")
@@ -196,41 +226,20 @@ def get_scene_classes(scene_names_to_classes, config):
         print(NO_SCENE_MESSAGE)
         return []
     if len(scene_names_to_classes) == 1:
-        return scene_names_to_classes.values()
+        return list(scene_names_to_classes.values())
     if config["scene_name"] in scene_names_to_classes:
         return [scene_names_to_classes[config["scene_name"]]]
     if config["scene_name"] != "":
         print(SCENE_NOT_FOUND_MESSAGE)
         return []
     if config["write_all"]:
-        return scene_names_to_classes.values()
+        return list(scene_names_to_classes.values())
     return prompt_user_for_choice(scene_names_to_classes)
 
 
-def get_module_windows(file_name):
-    module_name = file_name.replace(".py", "")
-    last_module = imp.load_module(
-        "__init__", *imp.find_module("__init__", ['.']))
-    for part in module_name.split(os.sep):
-        load_args = imp.find_module(
-            part, [os.path.dirname(last_module.__file__)])
-        last_module = imp.load_module(part, *load_args)
-    return last_module
-
-
-def get_module_posix(file_name):
-    module_name = file_name.replace(".py", "")
-    last_module = imp.load_module(".", *imp.find_module("."))
-    for part in module_name.split(os.sep):
-        load_args = imp.find_module(part, last_module.__path__)
-        last_module = imp.load_module(part, *load_args)
-    return last_module
-
-
 def get_module(file_name):
-    if os.name == 'nt':
-        return get_module_windows(file_name)
-    return get_module_posix(file_name)
+    module_name = file_name.replace(".py", "").replace(os.sep, ".")
+    return importlib.import_module(module_name)
 
 
 def main():
@@ -238,10 +247,10 @@ def main():
     module = get_module(config["file"])
     scene_names_to_classes = dict(inspect.getmembers(module, is_scene))
 
-    config["output_directory"] = os.path.join(
-        ANIMATIONS_DIR,
-        config["file"].replace(".py", "")
-    )
+    # config["output_directory"] = os.path.join(
+    #     ANIMATIONS_DIR,
+    #     config["file"].replace(".py", "")
+    # )
 
     scene_kwargs = dict([
         (key, config[key])
@@ -250,7 +259,6 @@ def main():
             "frame_duration",
             "skip_animations",
             "write_to_movie",
-            "output_directory",
             "save_pngs",
             "movie_file_extension",
             "start_at_animation_number",
@@ -260,7 +268,7 @@ def main():
 
     scene_kwargs["name"] = config["output_name"]
     if config["save_pngs"]:
-        print "We are going to save a PNG sequence as well..."
+        print("We are going to save a PNG sequence as well...")
         scene_kwargs["save_pngs"] = True
         scene_kwargs["pngs_mode"] = config["saved_image_mode"]
 

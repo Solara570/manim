@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+
 
 import numpy as np
 
@@ -6,14 +6,22 @@ from constants import *
 
 from animation.animation import Animation
 from animation.movement import Homotopy
+from animation.composition import AnimationGroup
+from animation.composition import Succession
+from animation.creation import ShowCreation
 from animation.creation import ShowPartial
+from animation.creation import FadeOut
 from animation.transform import Transform
 from mobject.mobject import Mobject
 from mobject.geometry import Circle
 from mobject.geometry import Dot
+from mobject.shape_matchers import SurroundingRectangle
+from utils.bezier import interpolate
 from utils.config_ops import digest_config
 from utils.rate_functions import squish_rate_func
 from utils.rate_functions import there_and_back
+from utils.rate_functions import wiggle
+from functools import reduce
 
 
 class FocusOn(Transform):
@@ -93,14 +101,49 @@ class ShowCreationThenDestruction(ShowPassingFlash):
     }
 
 
+class AnimationOnSurroundingRectangle(AnimationGroup):
+    CONFIG = {
+        "surrounding_rectangle_config": {},
+        # Function which takes in a rectangle, and spits
+        # out some animation.  Could be some animation class,
+        # could be something more
+        "rect_to_animation": Animation
+    }
+
+    def __init__(self, mobject, **kwargs):
+        digest_config(self, kwargs)
+        rect = SurroundingRectangle(
+            mobject, **self.surrounding_rectangle_config
+        )
+        AnimationGroup.__init__(self, self.rect_to_animation(rect, **kwargs))
+
+
+class ShowPassingFlashAround(AnimationOnSurroundingRectangle):
+    CONFIG = {
+        "rect_to_animation": ShowPassingFlash
+    }
+
+
+class ShowCreationThenDestructionAround(AnimationOnSurroundingRectangle):
+    CONFIG = {
+        "rect_to_animation": ShowCreationThenDestruction
+    }
+
+
+class CircleThenFadeAround(AnimationOnSurroundingRectangle):
+    CONFIG = {
+        "rect_to_animation": lambda rect: Succession(
+            ShowCreation, rect,
+            FadeOut, rect,
+        )
+    }
+
+
 class ApplyWave(Homotopy):
     CONFIG = {
-        "direction": DOWN,
+        "direction": UP,
         "amplitude": 0.2,
         "run_time": 1,
-        "apply_function_kwargs": {
-            "maintain_smoothness": False,
-        },
     }
 
     def __init__(self, mobject, **kwargs):
@@ -110,9 +153,9 @@ class ApplyWave(Homotopy):
         vect = self.amplitude * self.direction
 
         def homotopy(x, y, z, t):
-            start_point = np.array([x, y, z])
             alpha = (x - left_x) / (right_x - left_x)
-            power = np.exp(2 * (alpha - 0.5))
+            # lf = self.lag_factor
+            power = np.exp(2.0 * (alpha - 0.5))
             nudge = there_and_back(t**power)
             return np.array([x, y, z]) + nudge * vect
         Homotopy.__init__(self, homotopy, mobject, **kwargs)
@@ -178,13 +221,13 @@ class Vibrate(Animation):
 
     def update_mobject(self, alpha):
         time = alpha * self.run_time
-        families = map(
-            Mobject.submobject_family,
+        families = list(map(
+            Mobject.get_family,
             [self.mobject, self.starting_mobject]
-        )
+        ))
         for mob, start in zip(*families):
             mob.points = np.apply_along_axis(
-                lambda (x, y, z): (x, y + self.wave_function(x, time), z),
+                lambda x_y_z: (x_y_z[0], x_y_z[1] + self.wave_function(x_y_z[0], time), x_y_z[2]),
                 1, start.points
             )
 
@@ -195,7 +238,6 @@ class TurnInsideOut(Transform):
     }
 
     def __init__(self, mobject, **kwargs):
-        mobject.sort_points(np.linalg.norm)
         mob_copy = mobject.copy()
-        mob_copy.sort_points(lambda p: -np.linalg.norm(p))
+        mob_copy.reverse_points()
         Transform.__init__(self, mobject, mob_copy, **kwargs)

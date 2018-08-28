@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+
 
 import itertools as it
 import numpy as np
@@ -24,6 +24,7 @@ from for_3b1b_videos.pi_creature_animations import RemovePiCreatureBubble
 from scene.scene import Scene
 from utils.rate_functions import squish_rate_func
 from utils.rate_functions import there_and_back
+from utils.space_ops import get_norm
 
 
 class PiCreatureScene(Scene):
@@ -32,10 +33,10 @@ class PiCreatureScene(Scene):
         "seconds_to_blink": 3,
         "pi_creatures_start_on_screen": True,
         "default_pi_creature_kwargs": {
-            "color": GREY_BROWN,
-            "flip_at_start": True,
+            "color": BLUE,
+            "flip_at_start": False,
         },
-        "default_pi_creature_start_corner": DOWN + LEFT,
+        "default_pi_creature_start_corner": DL,
     }
 
     def setup(self):
@@ -62,15 +63,14 @@ class PiCreatureScene(Scene):
         return self.pi_creatures[0]
 
     def any_pi_creatures_on_screen(self):
-        mobjects = self.get_mobjects()
-        return any([pi in mobjects for pi in self.get_pi_creatures()])
+        return len(self.get_on_screen_pi_creatures()) > 0
 
     def get_on_screen_pi_creatures(self):
-        mobjects = self.get_mobjects()
-        return VGroup(*filter(
-            lambda pi: pi in mobjects,
-            self.get_pi_creatures()
-        ))
+        mobjects = self.get_mobject_family_members()
+        return VGroup(*[
+            pi for pi in self.get_pi_creatures()
+            if pi in mobjects
+        ])
 
     def introduce_bubble(self, *args, **kwargs):
         if isinstance(args[0], PiCreature):
@@ -99,7 +99,7 @@ class PiCreatureScene(Scene):
                 pi.bubble is not None and \
                 pi.bubble in on_screen_mobjects
 
-        pi_creatures_with_bubbles = filter(has_bubble, self.get_pi_creatures())
+        pi_creatures_with_bubbles = list(filter(has_bubble, self.get_pi_creatures()))
         if pi_creature in pi_creatures_with_bubbles:
             pi_creatures_with_bubbles.remove(pi_creature)
             old_bubble = pi_creature.bubble
@@ -161,10 +161,7 @@ class PiCreatureScene(Scene):
         if not self.any_pi_creatures_on_screen():
             return animations
 
-        non_pi_creature_anims = filter(
-            lambda anim: anim.mobject not in self.get_pi_creatures(),
-            animations
-        )
+        non_pi_creature_anims = [anim for anim in animations if anim.mobject not in self.get_pi_creatures()]
         if len(non_pi_creature_anims) == 0:
             return animations
         first_anim = non_pi_creature_anims[0]
@@ -176,16 +173,13 @@ class PiCreatureScene(Scene):
         for pi_creature in self.get_pi_creatures():
             if pi_creature not in self.get_mobjects():
                 continue
-            if pi_creature in first_anim.mobject.submobject_family():
+            if pi_creature in first_anim.mobject.get_family():
                 continue
-            anims_with_pi_creature = filter(
-                lambda anim: pi_creature in anim.mobject.submobject_family(),
-                animations
-            )
+            anims_with_pi_creature = [anim for anim in animations if pi_creature in anim.mobject.get_family()]
             for anim in anims_with_pi_creature:
                 if isinstance(anim, Transform):
-                    index = anim.mobject.submobject_family().index(pi_creature)
-                    target_family = anim.target_mobject.submobject_family()
+                    index = anim.mobject.get_family().index(pi_creature)
+                    target_family = anim.target_mobject.get_family()
                     target = target_family[index]
                     if isinstance(target, PiCreature):
                         target.look_at(point_of_interest)
@@ -241,18 +235,30 @@ class PiCreatureScene(Scene):
     def change_mode(self, mode):
         self.play(self.get_primary_pi_creature().change_mode, mode)
 
-    def look_at(self, thing_to_look_at, pi_creatures=None):
+    def look_at(self, thing_to_look_at, pi_creatures=None, **kwargs):
         if pi_creatures is None:
             pi_creatures = self.get_pi_creatures()
-        self.play(*it.chain(*[
+        args = list(it.chain(*[
             [pi.look_at, thing_to_look_at]
             for pi in pi_creatures
         ]))
+        self.play(*args, **kwargs)
+
+
+class MortyPiCreatureScene(PiCreatureScene):
+    CONFIG = {
+        "default_pi_creature_kwargs": {
+            "color": GREY_BROWN,
+            "flip_at_start": True,
+        },
+        "default_pi_creature_start_corner": DR,
+    }
 
 
 class TeacherStudentsScene(PiCreatureScene):
     CONFIG = {
         "student_colors": [BLUE_D, BLUE_E, BLUE_C],
+        "teacher_color": GREY_BROWN,
         "student_scale_factor": 0.8,
         "seconds_to_blink": 2,
         "screen_height": 3,
@@ -265,7 +271,7 @@ class TeacherStudentsScene(PiCreatureScene):
         self.hold_up_spot = self.teacher.get_corner(UP + LEFT) + MED_LARGE_BUFF * UP
 
     def create_pi_creatures(self):
-        self.teacher = Mortimer(color = self.default_pi_creature_kwargs["color"])
+        self.teacher = Mortimer(color=self.teacher_color)
         self.teacher.to_corner(DOWN + RIGHT)
         self.teacher.look(DOWN + LEFT)
         self.students = VGroup(*[
@@ -324,7 +330,7 @@ class TeacherStudentsScene(PiCreatureScene):
         )
 
     def get_student_changes(self, *modes, **kwargs):
-        pairs = zip(self.get_students(), modes)
+        pairs = list(zip(self.get_students(), modes))
         pairs = [(s, m) for s, m in pairs if m is not None]
         start = VGroup(*[s for s, m in pairs])
         target = VGroup(*[s.copy().change_mode(m) for s, m in pairs])
@@ -350,19 +356,21 @@ class TeacherStudentsScene(PiCreatureScene):
 
         def func(point):
             centered = point + vect
-            return radius * centered / np.linalg.norm(centered)
+            return radius * centered / get_norm(centered)
         self.play(*[
             ApplyPointwiseFunction(func, mob)
             for mob in self.get_mobjects()
         ])
 
-    def teacher_holds_up(self, mobject, target_mode="raise_right_hand", **kwargs):
+    def teacher_holds_up(self, mobject, target_mode="raise_right_hand", added_anims=None, **kwargs):
         mobject.move_to(self.hold_up_spot, DOWN)
         mobject.shift_onto_screen()
         mobject_copy = mobject.copy()
         mobject_copy.shift(DOWN)
         mobject_copy.fade(1)
+        added_anims = added_anims or []
         self.play(
             ReplacementTransform(mobject_copy, mobject),
             self.teacher.change, target_mode,
+            *added_anims
         )

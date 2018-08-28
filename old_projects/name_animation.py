@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 
+
 from big_ol_pile_of_manim_imports import *
 
 NAME_WITH_SPACES = "Prime Meridian"
@@ -19,7 +20,7 @@ class NameAnimationScene(Scene):
         letter_mobs = TextMobject(name)
         nb_letters = len(letter_mobs)
         randy = PiCreature()
-        randy.move_to(ORIGIN).scale_to_fit_height(0.5 * DIAMETER)
+        randy.move_to(ORIGIN).set_height(0.5 * DIAMETER)
         randy.set_color(BLUE_E)
         randy.look_at(UP + RIGHT)
         self.add(randy)
@@ -104,4 +105,4 @@ if __name__ == "__main__":
                 ),
             )
         except Exception as e:
-            print "Could not animate %s: %s" % (name, e)
+            print("Could not animate %s: %s" % (name, e))

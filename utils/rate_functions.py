@@ -4,6 +4,10 @@ from utils.bezier import bezier
 from utils.simple_functions import sigmoid
 
 
+def linear(t):
+    return t
+
+
 def smooth(t, inflection=10.0):
     error = sigmoid(-inflection / 2)
     return (sigmoid(inflection * (t - 0.5)) - error) / (1 - 2 * error)
@@ -33,13 +37,14 @@ def there_and_back(t, inflection=10.0):
     return smooth(new_t, inflection)
 
 
-def there_and_back_with_pause(t):
-    if t < 1. / 3:
-        return smooth(3 * t)
-    elif t < 2. / 3:
+def there_and_back_with_pause(t, pause_ratio=1. / 3):
+    a = 1. / pause_ratio
+    if t < 0.5 - pause_ratio / 2:
+        return smooth(a * t)
+    elif t < 0.5 + pause_ratio / 2:
         return 1
     else:
-        return smooth(3 - 3 * t)
+        return smooth(a - a * t)
 
 
 def running_start(t, pull_factor=-0.5):
@@ -78,3 +83,9 @@ def squish_rate_func(func, a=0.4, b=0.6):
 
 def lingering(t):
     return squish_rate_func(lambda t: t, 0, 0.8)(t)
+
+
+def exponential_decay(t, half_life=0.1):
+    # The half-life should be rather small to minimize
+    # the cut-off error at the end
+    return 1 - np.exp(-t / half_life)

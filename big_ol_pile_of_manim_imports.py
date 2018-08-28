@@ -10,8 +10,9 @@ or refactoring the library on current or older scene scripts should be entirely
 addressible by changing this file.
 
 Note: One should NOT import from this file for main library code, it is meant only
-as a convenience for scripts createing scenes for videos
+as a convenience for scripts creating scenes for videos.
 """
+
 
 from constants import *
 
@@ -36,6 +37,7 @@ from continual_animation.from_animation import *
 from continual_animation.numbers import *
 from continual_animation.update import *
 
+from mobject.coordinate_systems import *
 from mobject.frame import *
 from mobject.functions import *
 from mobject.geometry import *
@@ -49,6 +51,7 @@ from mobject.svg.brace import *
 from mobject.svg.drawings import *
 from mobject.svg.svg_mobject import *
 from mobject.svg.tex_mobject import *
+from mobject.three_d_utils import *
 from mobject.three_dimensions import *
 from mobject.types.image_mobject import *
 from mobject.types.point_cloud_mobject import *
@@ -84,6 +87,7 @@ from utils.color import *
 from utils.config_ops import *
 from utils.images import *
 from utils.iterables import *
+from utils.output_directory_getters import *
 from utils.paths import *
 from utils.rate_functions import *
 from utils.simple_functions import *
@@ -102,6 +106,7 @@ import random
 import re
 import string
 import sys
+import math
 
 from PIL import Image
 from colour import Color

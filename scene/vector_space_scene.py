@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+
 
 import numpy as np
 
@@ -10,6 +10,7 @@ from animation.creation import Write
 from animation.transform import ApplyFunction
 from animation.transform import ApplyPointwiseFunction
 from animation.creation import FadeOut
+from animation.creation import GrowArrow
 from animation.transform import Transform
 from mobject.mobject import Mobject
 from mobject.svg.tex_mobject import TexMobject
@@ -20,7 +21,7 @@ from scene.scene import Scene
 from mobject.geometry import Arrow
 from mobject.geometry import Dot
 from mobject.geometry import Line
-from mobject.geometry import Square
+from mobject.geometry import Rectangle
 from mobject.geometry import Vector
 from mobject.coordinate_systems import Axes
 from mobject.coordinate_systems import NumberPlane
@@ -31,12 +32,19 @@ from mobject.matrix import vector_coordinate_label
 from utils.rate_functions import rush_from
 from utils.rate_functions import rush_into
 from utils.space_ops import angle_of_vector
+from utils.space_ops import get_norm
 
 X_COLOR = GREEN_C
 Y_COLOR = RED_C
 Z_COLOR = BLUE_D
 
 
+# TODO: Much of this scene type seems dependent on the coordinate system chosen.
+# That is, being centered at the origin with grid units corresponding to the
+# arbitrary space units.  Change it!
+#
+# Also, methods I would have thought of as getters, like coords_to_vector, are
+# actually doing a lot of animating.
 class VectorScene(Scene):
     CONFIG = {
         "basis_vector_stroke_width": 6
@@ -65,11 +73,19 @@ class VectorScene(Scene):
         self.add(axes)
         self.freeze_background()
 
+    def get_vector(self, numerical_vector, **kwargs):
+        return Arrow(
+            self.plane.coords_to_point(0, 0),
+            self.plane.coords_to_point(*numerical_vector[:2]),
+            buff=0,
+            **kwargs
+        )
+
     def add_vector(self, vector, color=YELLOW, animate=True, **kwargs):
         if not isinstance(vector, Arrow):
             vector = Vector(vector, color=color, **kwargs)
         if animate:
-            self.play(ShowCreation(vector))
+            self.play(GrowArrow(vector))
         self.add(vector)
         return vector
 
@@ -106,6 +122,7 @@ class VectorScene(Scene):
         ])
 
     def get_vector_label(self, vector, label,
+                         at_tip=False,
                          direction="left",
                          rotate=False,
                          color=None,
@@ -120,15 +137,20 @@ class VectorScene(Scene):
         label.scale(label_scale_factor)
         label.add_background_rectangle()
 
-        angle = vector.get_angle()
-        if not rotate:
-            label.rotate(-angle, about_point=ORIGIN)
-        if direction is "left":
-            label.shift(-label.get_bottom() + 0.1 * UP)
+        if at_tip:
+            vect = vector.get_vector()
+            vect /= get_norm(vect)
+            label.next_to(vector.get_end(), vect, buff=SMALL_BUFF)
         else:
-            label.shift(-label.get_top() + 0.1 * DOWN)
-        label.rotate(angle, about_point=ORIGIN)
-        label.shift((vector.get_end() - vector.get_start()) / 2)
+            angle = vector.get_angle()
+            if not rotate:
+                label.rotate(-angle, about_point=ORIGIN)
+            if direction is "left":
+                label.shift(-label.get_bottom() + 0.1 * UP)
+            else:
+                label.shift(-label.get_top() + 0.1 * DOWN)
+            label.rotate(angle, about_point=ORIGIN)
+            label.shift((vector.get_end() - vector.get_start()) / 2)
         return label
 
     def label_vector(self, vector, label, animate=True, **kwargs):
@@ -281,10 +303,10 @@ class LinearTransformationScene(VectorScene):
     }
 
     def setup(self):
+        # The has_already_setup attr is to not break all the old Scenes
         if hasattr(self, "has_already_setup"):
             return
         self.has_already_setup = True
-        # ^This is to not break all the old Scenes
         self.background_mobjects = []
         self.foreground_mobjects = []
         self.transformable_mobjects = []
@@ -311,6 +333,7 @@ class LinearTransformationScene(VectorScene):
             )
             self.moving_vectors += list(self.basis_vectors)
             self.i_hat, self.j_hat = self.basis_vectors
+            self.add(self.basis_vectors)
 
     def add_special_mobjects(self, mob_list, *mobs_to_add):
         for mobject in mobs_to_add:
@@ -321,6 +344,7 @@ class LinearTransformationScene(VectorScene):
     def add_background_mobject(self, *mobjects):
         self.add_special_mobjects(self.background_mobjects, *mobjects)
 
+    # TODO, this conflicts with Scene.add_fore
     def add_foreground_mobject(self, *mobjects):
         self.add_special_mobjects(self.foreground_mobjects, *mobjects)
 
@@ -331,15 +355,26 @@ class LinearTransformationScene(VectorScene):
         mobject.target = target_mobject
         self.add_special_mobjects(self.moving_mobjects, mobject)
 
-    def add_unit_square(self, color=YELLOW, opacity=0.3, animate=False):
-        square = Square(color=color, side_length=1)
-        square.shift(-square.get_corner(DOWN + LEFT))
+    def get_unit_square(self, color=YELLOW, opacity=0.3, stroke_width=3):
+        square = Rectangle(
+            color=color,
+            width=self.plane.get_x_unit_size(),
+            height=self.plane.get_y_unit_size(),
+            stroke_color=color,
+            stroke_width=stroke_width,
+            fill_color=color,
+            fill_opacity=opacity
+        )
+        square.move_to(self.plane.coords_to_point(0, 0), DL)
+        return square
+
+    def add_unit_square(self, animate=False, **kwargs):
+        square = self.get_unit_square(**kwargs)
         if animate:
-            added_anims = map(Animation, self.moving_vectors)
-            self.play(ShowCreation(square), *added_anims)
-            self.play(square.set_fill, color, opacity, *added_anims)
-        else:
-            square.set_fill(color, opacity)
+            self.play(
+                DrawBorderThenFill(square),
+                Animation(Group(*self.moving_vectors))
+            )
         self.add_transformable_mobject(square)
         self.bring_to_front(*self.moving_vectors)
         self.square = square
@@ -357,12 +392,19 @@ class LinearTransformationScene(VectorScene):
         self.add_foreground_mobject(coords)
         return coords
 
-    def add_transformable_label(self, vector, label, new_label=None, **kwargs):
+    def add_transformable_label(
+            self, vector, label,
+            transformation_name="L",
+            new_label=None,
+            **kwargs):
         label_mob = self.label_vector(vector, label, **kwargs)
         if new_label:
             label_mob.target_text = new_label
         else:
-            label_mob.target_text = "L(%s)" % label_mob.get_tex_string()
+            label_mob.target_text = "%s(%s)" % (
+                transformation_name,
+                label_mob.get_tex_string()
+            )
         label_mob.vector = vector
         label_mob.kwargs = kwargs
         if "animate" in label_mob.kwargs:
@@ -391,7 +433,7 @@ class LinearTransformationScene(VectorScene):
             new_matrix[:2, :2] = transposed_matrix
             transposed_matrix = new_matrix
         elif transposed_matrix.shape != (3, 3):
-            raise "Matrix has bad dimensions"
+            raise Exception("Matrix has bad dimensions")
         return lambda point: np.dot(point, transposed_matrix)
 
     def get_piece_movement(self, pieces):
@@ -412,7 +454,7 @@ class LinearTransformationScene(VectorScene):
     def get_vector_movement(self, func):
         for v in self.moving_vectors:
             v.target = Vector(func(v.get_end()), color=v.get_color())
-            norm = np.linalg.norm(v.target.get_end())
+            norm = get_norm(v.target.get_end())
             if norm < 0.1:
                 v.target.get_tip().scale_in_place(norm)
         return self.get_piece_movement(self.moving_vectors)
@@ -426,6 +468,9 @@ class LinearTransformationScene(VectorScene):
 
     def apply_matrix(self, matrix, **kwargs):
         self.apply_transposed_matrix(np.array(matrix).T, **kwargs)
+
+    def apply_inverse(self, matrix, **kwargs):
+        self.apply_matrix(np.linalg.inv(matrix), **kwargs)
 
     def apply_transposed_matrix(self, transposed_matrix, **kwargs):
         func = self.get_transposed_matrix_transformation(transposed_matrix)
