@@ -35,7 +35,6 @@ class SingleStringTexMobject(SVGMobject):
         "organize_left_to_right": False,
         "propagate_style_to_family": True,
         "alignment": "",
-        "encoding": "GBK",
     }
 
     def __init__(self, tex_string, **kwargs):
@@ -45,7 +44,6 @@ class SingleStringTexMobject(SVGMobject):
         file_name = tex_to_svg_file(
             self.get_modified_expression(tex_string),
             self.template_tex_file_body,
-            self.encoding,
         )
         SVGMobject.__init__(self, file_name=file_name, **kwargs)
         if self.height is None:

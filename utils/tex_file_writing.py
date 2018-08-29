@@ -14,19 +14,13 @@ def tex_hash(expression, template_tex_file_body):
     return hasher.hexdigest()[:16]
 
 
-def enc_conv(filename, in_enc, out_enc):
-    content = open(filename, "r").read()
-    conv_content = content.decode(in_enc).encode(out_enc)
-    open(filename, "w").write(conv_content)
-
-
-def tex_to_svg_file(expression, template_tex_file_body, encoding):
-    tex_file = generate_tex_file(expression, template_tex_file_body, encoding)
+def tex_to_svg_file(expression, template_tex_file_body):
+    tex_file = generate_tex_file(expression, template_tex_file_body)
     dvi_file = tex_to_dvi(tex_file)
     return dvi_to_svg(dvi_file)
 
 
-def generate_tex_file(expression, template_tex_file_body, encoding):
+def generate_tex_file(expression, template_tex_file_body):
     result = os.path.join(
         TEX_DIR,
         tex_hash(expression, template_tex_file_body)
@@ -40,11 +34,6 @@ def generate_tex_file(expression, template_tex_file_body, encoding):
         )
         with open(result, "w") as outfile:
             outfile.write(new_body)
-    if encoding != "UTF8":
-        try:
-            enc_conv(result, in_enc = "UTF8", out_enc = encoding)
-        except:
-            pass
     return result
 
 
