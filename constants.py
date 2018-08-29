@@ -116,7 +116,6 @@ DEGREES = TAU / 360
 
 # Change this to point to where you want 
 # animation files to output
-MEDIA_DIR = os.path.join(FILE_DIR, "movies")
 ANIMATIONS_DIR = os.path.join(MEDIA_DIR, "animations")
 RASTER_IMAGE_DIR = os.path.join(MEDIA_DIR, "designs", "raster_images")
 SVG_IMAGE_DIR = os.path.join(MEDIA_DIR, "designs", "svg_images")
@@ -138,7 +137,8 @@ for folder in [FILE_DIR, RASTER_IMAGE_DIR, SVG_IMAGE_DIR, ANIMATIONS_DIR, TEX_DI
         os.makedirs(folder)
 
 TEX_TEXT_TO_REPLACE = "YourTextHere"
-TEMPLATE_TEX_FILE = os.path.join(THIS_DIR, "tex_template.tex")
+# TEMPLATE_TEX_FILE = os.path.join(THIS_DIR, "tex_template.tex")
+TEMPLATE_TEX_FILE = os.path.join(THIS_DIR, "tex_cjk_template.tex")
 with open(TEMPLATE_TEX_FILE, "r") as infile:
     TEMPLATE_TEXT_FILE_BODY = infile.read()
     TEMPLATE_TEX_FILE_BODY = TEMPLATE_TEXT_FILE_BODY.replace(
