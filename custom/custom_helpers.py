@@ -1,8 +1,12 @@
-import sys
-sys.path.append("..")
+#coding=utf-8
 
-from helpers import *
-from mobject.vectorized_mobject import VGroup
+import numpy as np
+import random
+
+from constants import *
+from mobject.types.vectorized_mobject import VGroup
+from utils.color import rgb_to_color, color_to_rgb
+
 
 def list_shuffle(l):
     """Return a shuffled copy of the original list ``l``."""
@@ -25,17 +29,17 @@ def mobs_shuffle(mobs):
     mobs.submobjects = list_shuffle(mobs.submobjects)
     return mobs
 
-def tweak_color(color1, color2, alpha = 0.3):
-    """Return a weighted average of two colors."""
-    alpha = clamp(0, 1, alpha)
-    tweaked_rgb = alpha * color_to_rgb(color2) + (1-alpha) * color_to_rgb(color1)
+def tweak_color(color1, color2, weight = 0.3):
+    """Return a weighted-average of two colors."""
+    weight = np.clip(weight, 0, 1)
+    tweaked_rgb = weight * color_to_rgb(color2) + (1-weight) * color_to_rgb(color1)
     return rgb_to_color(tweaked_rgb)
 
-def brighten(color, alpha = 0.3):
-    return tweak_color(color, WHITE, alpha)
+def brighten(color, weight = 0.3):
+    return tweak_color(color, WHITE, weight)
 
-def darken(color, alpha = 0.3):
-    return tweak_color(color, BLACK, alpha)
+def darken(color, weight = 0.3):
+    return tweak_color(color, BLACK, weight)
 
 
 
