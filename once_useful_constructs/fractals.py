@@ -13,7 +13,10 @@ from utils.space_ops import center_of_mass
 from utils.space_ops import compass_directions
 from utils.space_ops import rotate_vector
 from utils.space_ops import rotation_matrix
+from utils.space_ops import get_norm
 
+import random
+import itertools as it
 from constants import *
 from functools import reduce
 
