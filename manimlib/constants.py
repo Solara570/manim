@@ -39,11 +39,11 @@ for folder in [FILE_DIR, RASTER_IMAGE_DIR, SVG_IMAGE_DIR, VIDEO_DIR,
     if not os.path.exists(folder):
         os.makedirs(folder)
 
-TEX_USE_CTEX = False
+TEX_USE_CTEX = True
 TEX_TEXT_TO_REPLACE = "YourTextHere"
 TEMPLATE_TEX_FILE = os.path.join(
     THIS_DIR, "tex_template.tex" if not TEX_USE_CTEX
-    else "ctex_template.tex"
+    else "xelatex_template.tex"
 )
 with open(TEMPLATE_TEX_FILE, "r") as infile:
     TEMPLATE_TEXT_FILE_BODY = infile.read()
