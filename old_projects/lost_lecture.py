@@ -1459,6 +1459,7 @@ class GeometryProofLand(Scene):
             PINK, RED, YELLOW, GREEN, GREEN_A, BLUE,
             MAROON_E, MAROON_B, YELLOW, BLUE,
         ],
+        "text": "Geometry proof land",
     }
 
     def construct(self):
@@ -1469,6 +1470,7 @@ class GeometryProofLand(Scene):
         colors = list(self.colors)
         random.shuffle(colors)
         word_outlines.set_color_by_gradient(*colors)
+        word_outlines.set_stroke(width=5)
 
         circles = VGroup()
         for letter in word:
@@ -1485,14 +1487,16 @@ class GeometryProofLand(Scene):
             LaggedStart(MoveToTarget, circles),
             run_time=2
         )
+        self.add(word_outlines, circles)
         self.play(LaggedStart(
-            ShowCreationThenDestruction, word_outlines,
-            run_time=4
-        ))
+            FadeIn, word_outlines,
+            run_time=3,
+            rate_func=there_and_back,
+        ), Animation(circles))
         self.wait()
 
     def get_geometry_proof_land_word(self):
-        word = TextMobject("Geometry proof land")
+        word = TextMobject(self.text)
         word.rotate(-90 * DEGREES)
         word.scale(0.25)
         word.shift(3 * RIGHT)
@@ -1502,6 +1506,7 @@ class GeometryProofLand(Scene):
         word.center()
         word.to_edge(UP)
         word.set_color_by_gradient(*self.colors)
+        word.set_background_stroke(width=0)
         return word
 
 
@@ -3355,7 +3360,7 @@ class ShowEqualAngleSlices(IntroduceShapeOfVelocities):
             delta_t_numerator.scale, 1.5, {"about_edge": DOWN},
             delta_t_numerator.set_color, YELLOW
         )
-        self.play(CircleThenFadeAround(prop_exp[:-2]))
+        self.play(ShowCreationThenFadeAround(prop_exp[:-2]))
         self.play(
             delta_t_numerator.fade, 1,
             MoveToTarget(moving_R_squared),
@@ -3442,7 +3447,7 @@ class ShowEqualAngleSlices(IntroduceShapeOfVelocities):
         polygon.set_fill(BLUE_E, opacity=0.8)
         polygon.set_stroke(WHITE, 3)
 
-        self.play(CircleThenFadeAround(v1))
+        self.play(ShowCreationThenFadeAround(v1))
         self.play(
             MoveToTarget(v1),
             GrowFromCenter(root_dot),

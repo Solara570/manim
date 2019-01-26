@@ -1,5 +1,5 @@
 from big_ol_pile_of_manim_imports import *
-from eola.chapter5 import get_det_text, RightHandRule
+from old_projects.eola.chapter5 import get_det_text, RightHandRule
 
 
 U_COLOR = ORANGE
@@ -823,7 +823,7 @@ class Define2dCrossProduct(LinearTransformationScene):
             FadeIn(self.w.label),
             FadeIn(self.v.coord_array),
             FadeIn(self.w.coord_array),
-            matrix.set_color_columns, V_COLOR, W_COLOR
+            matrix.set_column_colors, V_COLOR, W_COLOR
         )
         self.wait()
         self.i_hat, self.j_hat = i_hat, j_hat
@@ -1159,7 +1159,7 @@ class BiggerWhenPerpendicular(LinearTransformationScene):
         w.target = w.copy().rotate(np.pi/5)
         transforms = [
             self.get_matrix_transformation([v1.get_end()[:2], v2.get_end()[:2]])
-            for v1, v2 in (v, w), (v.target, w.target)
+            for v1, v2 in [(v, w), (v.target, w.target)]
         ]
         start_square, end_square = [
             square.copy().apply_function(transform)
@@ -1666,7 +1666,7 @@ class CrossAndDualWords(Scene):
             ["v_1", "v_2", "v_3"],
             ["w_1", "w_2", "w_3"],
         ]).T)
-        matrix.set_color_columns(WHITE, U_COLOR, W_COLOR)
+        matrix.set_column_colors(WHITE, U_COLOR, W_COLOR)
         det_text = get_det_text(matrix, background_rect = False)
         det_text.add(matrix)
         dot_with_cross = TexMobject(

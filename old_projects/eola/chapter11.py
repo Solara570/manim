@@ -1,9 +1,9 @@
 from big_ol_pile_of_manim_imports import *
-from eola.chapter1 import plane_wave_homotopy
-from eola.chapter3 import ColumnsToBasisVectors
-from eola.chapter5 import NameDeterminant, Blob
-from eola.chapter9 import get_small_bubble
-from eola.chapter10 import ExampleTranformationScene
+from old_projects.eola.chapter1 import plane_wave_homotopy
+from old_projects.eola.chapter3 import ColumnsToBasisVectors
+from old_projects.eola.chapter5 import NameDeterminant, Blob
+from old_projects.eola.chapter9 import get_small_bubble
+from old_projects.eola.chapter10 import ExampleTranformationScene
 
 class Student(PiCreature):
     CONFIG = {
@@ -505,7 +505,7 @@ class DeterminantAndEigenvectorDontCare(LinearTransformationScene):
             vectors = VGroup(*[
                 Vector(u*x*v)
                 for x in range(7, 0, -1)
-                for u in -1, 1
+                for u in [-1, 1]
             ])
             vectors.set_color_by_gradient(MAROON_A, MAROON_C)
             result += list(vectors)
@@ -1722,7 +1722,7 @@ class IntroducePolynomialSpace(Scene):
         last_col.arrange_submobjects(DOWN, buff = 0.83)
         last_col.move_to(last_col_top, aligned_edge = UP+RIGHT)
         ##End horrible
-        matrix.set_color_columns(X_COLOR, Y_COLOR, Z_COLOR, MAROON_B)
+        matrix.set_column_colors(X_COLOR, Y_COLOR, Z_COLOR, MAROON_B)
 
         deriv = TexMobject("\\dfrac{d}{dx}")
         equals = TexMobject("=")
@@ -1870,8 +1870,8 @@ class IntroducePolynomialSpace(Scene):
 class MatrixVectorMultiplicationAndDerivative(TeacherStudentsScene):
     def construct(self):
         mv_mult = VGroup(
-            Matrix([[3, 1], [0, 2]]).set_color_columns(X_COLOR, Y_COLOR),
-            Matrix(["x", "y"]).set_color_columns(YELLOW)
+            Matrix([[3, 1], [0, 2]]).set_column_colors(X_COLOR, Y_COLOR),
+            Matrix(["x", "y"]).set_column_colors(YELLOW)
         )
         mv_mult.arrange_submobjects()
         mv_mult.scale(0.75)
