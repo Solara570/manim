@@ -181,6 +181,7 @@ class Circle(Arc):
         self.set_width(
             np.sqrt(mobject.get_width()**2 + mobject.get_height()**2))
         self.scale(buffer_factor)
+        return self
 
     def get_point_from_angle(self, angle):
         start_angle = angle_of_vector(

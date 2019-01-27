@@ -511,6 +511,7 @@ class Mobject(Container):
     def surround(self, mobject, dim_to_match=0, stretch=False, buffer_factor=1.2):
         self.replace(mobject, dim_to_match, stretch)
         self.scale_in_place(buffer_factor)
+        return self
 
     def position_endpoints_on(self, start, end):
         curr_vect = self.points[-1] - self.points[0]
