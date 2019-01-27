@@ -1,3 +1,5 @@
+import random
+import itertools as it
 from functools import reduce
 
 from manimlib.constants import *
@@ -12,6 +14,7 @@ from manimlib.mobject.types.vectorized_mobject import VMobject
 from manimlib.utils.bezier import interpolate
 from manimlib.utils.color import color_gradient
 from manimlib.utils.config_ops import digest_config
+from manimlib.utils.space_ops import get_norm
 from manimlib.utils.space_ops import center_of_mass
 from manimlib.utils.space_ops import compass_directions
 from manimlib.utils.space_ops import rotate_vector
