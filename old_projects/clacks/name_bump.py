@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 from big_ol_pile_of_manim_imports import *
-
-from active_projects.clacks.question import BlocksAndWallExample
+from old_projects.clacks.question import BlocksAndWallExample
 
 
 class NameBump(BlocksAndWallExample):
     CONFIG = {
-        "name": "Magnus Lysfjord",
+        "name": "Grant Sanderson",
         "sliding_blocks_config": {
             "block1_config": {
                 "mass": 1e6,

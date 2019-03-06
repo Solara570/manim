@@ -19,8 +19,6 @@ if not os.path.isdir(MEDIA_DIR):
         f"Media will be stored in {MEDIA_DIR + os.sep}. You can change "
         "this behavior by writing a different directory to media_dir.txt."
     )
-with open("media_dir.txt", 'w') as media_file:
-    media_file.write(MEDIA_DIR)
 
 VIDEO_DIR = os.path.join(MEDIA_DIR, "videos")
 RASTER_IMAGE_DIR = os.path.join(MEDIA_DIR, "designs", "raster_images")
@@ -28,7 +26,7 @@ SVG_IMAGE_DIR = os.path.join(MEDIA_DIR, "designs", "svg_images")
 SOUND_DIR = os.path.join(MEDIA_DIR, "designs", "sounds")
 ###
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
-FILE_DIR = os.path.join(THIS_DIR, "files")
+FILE_DIR = os.path.join(os.getenv("FILE_DIR", default=THIS_DIR), "files")
 TEX_DIR = os.path.join(FILE_DIR, "Tex")
 # These two may be depricated now.
 MOBJECT_DIR = os.path.join(FILE_DIR, "mobjects")
@@ -109,7 +107,7 @@ LOW_QUALITY_CAMERA_CONFIG = {
 
 DEFAULT_PIXEL_HEIGHT = PRODUCTION_QUALITY_CAMERA_CONFIG["pixel_height"]
 DEFAULT_PIXEL_WIDTH = PRODUCTION_QUALITY_CAMERA_CONFIG["pixel_width"]
-DEFAULT_FRAME_DURATION = 30
+DEFAULT_FRAME_RATE = 60
 
 DEFAULT_POINT_DENSITY_2D = 25
 DEFAULT_POINT_DENSITY_1D = 250
@@ -131,7 +129,6 @@ DEFAULT_MOBJECT_TO_MOBJECT_BUFFER = MED_SMALL_BUFF
 
 
 # All in seconds
-DEFAULT_ANIMATION_RUN_TIME = 1.0
 DEFAULT_POINTWISE_FUNCTION_RUN_TIME = 3.0
 DEFAULT_WAIT_TIME = 1.0
 

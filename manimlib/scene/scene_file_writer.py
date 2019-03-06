@@ -119,7 +119,9 @@ class SceneFileWriter(object):
     def create_audio_segment(self):
         self.audio_segment = AudioSegment.silent()
 
-    def add_audio_segment(self, new_segment, time=None):
+    def add_audio_segment(self, new_segment,
+                          time=None,
+                          gain_to_background=None):
         if not self.includes_sound:
             self.includes_sound = True
             self.create_audio_segment()
@@ -138,13 +140,17 @@ class SceneFileWriter(object):
                 crossfade=0,
             )
         self.audio_segment = segment.overlay(
-            new_segment, position=int(1000 * time)
+            new_segment,
+            position=int(1000 * time),
+            gain_during_overlay=gain_to_background,
         )
 
-    def add_sound(self, sound_file, time):
+    def add_sound(self, sound_file, time=None, gain=None, **kwargs):
         file_path = get_full_sound_file_path(sound_file)
         new_segment = AudioSegment.from_file(file_path)
-        self.add_audio_segment(new_segment, time)
+        if gain:
+            new_segment = new_segment.apply_gain(gain)
+        self.add_audio_segment(new_segment, time, **kwargs)
 
     # Writers
     def begin_animation(self, allow_write=False):
@@ -193,7 +199,7 @@ class SceneFileWriter(object):
 
     def open_movie_pipe(self):
         file_path = self.get_next_partial_movie_path()
-        temp_file_path = file_path.replace(".", "_temp.")
+        temp_file_path = os.path.splitext(file_path)[0] + '_temp' + self.movie_file_extension
 
         self.partial_movie_file_path = file_path
         self.temp_partial_movie_file_path = temp_file_path
@@ -269,6 +275,10 @@ class SceneFileWriter(object):
             self.partial_movie_directory,
             **kwargs
         )
+        if len(partial_movie_files) == 0:
+            print("No animations in this scene")
+            return
+
         # Write a file partial_file_list.txt containing all
         # partial movie files
         file_list = os.path.join(
@@ -297,7 +307,6 @@ class SceneFileWriter(object):
 
         combine_process = subprocess.Popen(commands)
         combine_process.wait()
-        # os.remove(file_list)
 
         if self.includes_sound:
             sound_file_path = movie_file_path.replace(
@@ -305,17 +314,25 @@ class SceneFileWriter(object):
             )
             # Makes sure sound file length will match video file
             self.add_audio_segment(AudioSegment.silent(0))
-            self.audio_segment.export(sound_file_path)
+            self.audio_segment.export(
+                sound_file_path,
+                bitrate='312k',
+            )
             temp_file_path = movie_file_path.replace(".", "_temp.")
-            commands = commands = [
+            commands = [
                 "ffmpeg",
                 "-i", movie_file_path,
                 "-i", sound_file_path,
                 '-y',  # overwrite output file if it exists
-                "-c:v", "copy", "-c:a", "aac",
+                "-c:v", "copy",
+                "-c:a", "aac",
+                "-b:a", "320k",
+                # select video stream from first file
+                "-map", "0:v:0",
+                # select audio stream from second file
+                "-map", "1:a:0",
                 '-loglevel', 'error',
-                "-shortest",
-                "-strict", "experimental",
+                # "-shortest",
                 temp_file_path,
             ]
             subprocess.call(commands)

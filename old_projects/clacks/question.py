@@ -1,6 +1,7 @@
 from big_ol_pile_of_manim_imports import *
-import subprocess
-from pydub import AudioSegment
+
+
+OUTPUT_DIRECTORY = "clacks/question"
 
 
 class Block(Square):
@@ -15,7 +16,7 @@ class Block(Square):
         "stroke_color": WHITE,
         "fill_color": None,
         "sheen_direction": UL,
-        "sheen": 0.5,
+        "sheen_factor": 0.5,
         "sheen_direction": UL,
     }
 
@@ -45,7 +46,7 @@ class Block(Square):
     def mass_to_color(self, mass):
         colors = [
             LIGHT_GREY,
-            BLUE_B,
+            BLUE_D,
             BLUE_D,
             BLUE_E,
             BLUE_E,
@@ -78,11 +79,11 @@ class SlidingBlocks(VGroup):
         "collect_clack_data": True,
     }
 
-    def __init__(self, surrounding_scene, **kwargs):
+    def __init__(self, scene, **kwargs):
         VGroup.__init__(self, **kwargs)
-        self.surrounding_scene = surrounding_scene
-        self.floor = surrounding_scene.floor
-        self.wall = surrounding_scene.wall
+        self.scene = scene
+        self.floor = scene.floor
+        self.wall = scene.wall
 
         self.block1 = self.get_block(**self.block1_config)
         self.block2 = self.get_block(**self.block2_config)
@@ -158,7 +159,7 @@ class SlidingBlocks(VGroup):
             DR,
         )
 
-        self.surrounding_scene.update_num_clacks(n_clacks)
+        self.scene.update_num_clacks(n_clacks)
 
     def get_clack_data(self):
         ps_point = self.phase_space_point_tracker.get_location()
@@ -196,7 +197,9 @@ class SlidingBlocks(VGroup):
         return clack_data
 
 
-class ClackFlashes(ContinualAnimation):
+# TODO, this is untested after turning it from a
+# ContinualAnimation into a VGroup
+class ClackFlashes(VGroup):
     CONFIG = {
         "flash_config": {
             "run_time": 0.5,
@@ -208,32 +211,39 @@ class ClackFlashes(ContinualAnimation):
     }
 
     def __init__(self, clack_data, **kwargs):
-        digest_config(self, kwargs)
+        VGroup.__init__(self, **kwargs)
         self.flashes = []
-        group = Group()
         last_time = 0
         for location, time in clack_data:
             if (time - last_time) < self.min_time_between_flashes:
                 continue
             last_time = time
             flash = Flash(location, **self.flash_config)
+            flash.begin()
+            for sm in flash.mobject.family_members_with_points():
+                if isinstance(sm, VMobject):
+                    sm.set_stroke(YELLOW, 3)
+                    sm.set_stroke(WHITE, 6, 0.5, background=True)
             flash.start_time = time
             flash.end_time = time + flash.run_time
             self.flashes.append(flash)
-        ContinualAnimation.__init__(self, group, **kwargs)
 
-    def update_mobject(self, dt):
-        total_time = self.external_time
+        self.time = 0
+        self.add_updater(lambda m: m.update(dt))
+
+    def update(self, dt):
+        time = self.time
+        self.time += dt
         for flash in self.flashes:
-            if flash.start_time < total_time < flash.end_time:
-                if flash.mobject not in self.mobject:
-                    self.mobject.add(flash.mobject)
+            if flash.start_time < time < flash.end_time:
+                if flash.mobject not in self.submobjects:
+                    self.add(flash.mobject)
                 flash.update(
-                    (total_time - flash.start_time) / flash.run_time
+                    (time - flash.start_time) / flash.run_time
                 )
             else:
-                if flash.mobject in self.mobject:
-                    self.mobject.remove(flash.mobject)
+                if flash.mobject in self.submobjects:
+                    self.remove(flash.mobject)
 
 
 class Wall(Line):
@@ -266,6 +276,7 @@ class Wall(Line):
 class BlocksAndWallScene(Scene):
     CONFIG = {
         "include_sound": True,
+        "collision_sound": "clack.wav",
         "count_clacks": True,
         "counter_group_shift_vect": LEFT,
         "sliding_blocks_config": {},
@@ -273,7 +284,6 @@ class BlocksAndWallScene(Scene):
         "wall_x": -6,
         "n_wall_ticks": 15,
         "counter_label": "\\# Collisions: ",
-        "collision_sound": "clack.wav",
         "show_flash_animations": True,
         "min_time_between_sounds": 0.004,
     }
@@ -345,56 +355,30 @@ class BlocksAndWallScene(Scene):
                 return
             self.counter_mob.set_value(n_clacks)
 
-    def create_sound_file(self, clack_data):
-        clack_file = os.path.join(SOUND_DIR, self.collision_sound)
-        output_file = self.get_movie_file_path(extension='.wav')
+    def add_clack_sounds(self, clack_data):
+        clack_file = self.collision_sound
+        total_time = self.get_time()
         times = [
             time
             for location, time in clack_data
-            if time < 300  # In case of any extremes
+            if time < total_time
         ]
-
-        clack = AudioSegment.from_wav(clack_file)
-        total_time = max(times) + 1
-        clacks = AudioSegment.silent(int(1000 * total_time))
-        last_position = 0
-        min_diff = int(1000 * self.min_time_between_sounds)
+        last_time = 0
         for time in times:
-            position = int(1000 * time)
-            d_position = position - last_position
-            if d_position < min_diff:
+            d_time = time - last_time
+            if d_time < self.min_time_between_sounds:
                 continue
-            if time > self.get_time():
-                break
-            last_position = position
-            clacks = clacks.fade(-50, start=position, end=position + 10)
-            clacks = clacks.overlay(
-                clack,
-                position=position
+            last_time = time
+            self.add_sound(
+                clack_file,
+                time_offset=(time - total_time),
+                gain=-20,
             )
-        clacks.export(output_file, format="wav")
-        return output_file
+        return self
 
-    # TODO, this no longer works
-    # should use Scene.add_sound instead
-    def combine_movie_files(self):
-        Scene.combine_movie_files(self)
+    def tear_down(self):
         if self.include_sound:
-            sound_file_path = self.create_sound_file(self.clack_data)
-            movie_path = self.get_movie_file_path()
-            temp_path = self.get_movie_file_path(str(self) + "TempSound")
-            commands = [
-                "ffmpeg",
-                "-i", movie_path,
-                "-i", sound_file_path,
-                "-c:v", "copy", "-c:a", "aac",
-                '-loglevel', 'error',
-                "-strict", "experimental",
-                temp_path,
-            ]
-            subprocess.call(commands)
-            subprocess.call(["rm", sound_file_path])
-            subprocess.call(["mv", temp_path, movie_path])
+            self.add_clack_sounds(self.clack_data)
 
 # Animated scenes
 
@@ -413,25 +397,29 @@ class NameIntro(Scene):
         self.play(
             VFadeIn(blue),
             VFadeIn(brown),
-            Restore(brown, rate_func=None),
+            Restore(brown, rate_func=linear),
         )
         self.play(
             Flash(blue.get_right(), run_time=flash_time),
             ApplyMethod(
                 blue.to_edge, LEFT, {"buff": 0},
-                rate_func=None,
+                rate_func=linear,
             ),
         )
         self.play(
             Flash(blue.get_left(), run_time=flash_time),
-            Restore(blue, rate_func=None),
+            Restore(blue, rate_func=linear),
         )
         self.play(
             Flash(blue.get_right(), run_time=flash_time),
             ApplyMethod(
                 brown.to_edge, RIGHT, {"buff": 0},
-                rate_func=None,
+                rate_func=linear,
             )
+        )
+        self.play(
+            Flash(brown.get_right(), run_time=flash_time),
+            Restore(brown, rate_func=linear)
         )
 
 
@@ -454,12 +442,12 @@ class MathAndPhysicsConspiring(Scene):
             TexMobject("\\pi = {:.16}\\dots".format(PI)),
             self.get_tangent_image(),
         )
-        math_stuffs.arrange_submobjects(DOWN, buff=MED_LARGE_BUFF)
+        math_stuffs.arrange(DOWN, buff=MED_LARGE_BUFF)
         math_stuffs.next_to(math_title, DOWN, LARGE_BUFF)
         to_fade = VGroup(math_title, *math_stuffs, physics_title)
 
         self.play(
-            LaggedStart(
+            LaggedStartMap(
                 FadeInFromDown, to_fade,
                 lag_ratio=0.7,
                 run_time=3,
@@ -618,7 +606,7 @@ class TwoBlocksLabel(Scene):
         arrows.set_color(RED)
         self.play(
             Write(label),
-            LaggedStart(GrowArrow, arrows, lag_ratio=0.7),
+            LaggedStartMap(GrowArrow, arrows, lag_ratio=0.7),
             run_time=1
         )
         self.wait()
@@ -763,6 +751,19 @@ class BlocksAndWallExampleMass1e2(BlocksAndWallExample):
     }
 
 
+class BlocksAndWallExampleMassSameSpeedAtEnd(BlocksAndWallExample):
+    CONFIG = {
+        "sliding_blocks_config": {
+            "block1_config": {
+                "mass": 1 / np.tan(PI / 5)**2,
+                "velocity": -1,
+                "label_text": "$\\frac{1}{\\tan(\\pi / 5)^2}$ kg"
+            }
+        },
+        "wait_time": 25,
+    }
+
+
 class BlocksAndWallExampleMass1e4(BlocksAndWallExample):
     CONFIG = {
         "sliding_blocks_config": {
@@ -865,7 +866,7 @@ class DigitsOfPi(Scene):
         self.add(pi_creature, equation[1])
         self.play(ShowIncreasingSubsets(
             equation[2:],
-            rate_func=None,
+            rate_func=linear,
             run_time=1,
         ))
         self.play(Blink(pi_creature))
@@ -928,7 +929,7 @@ class PiComputingAlgorithmsAxes(Scene):
             method.shift_onto_screen()
             algorithms.add(VGroup(method, cross))
 
-        self.play(LaggedStart(
+        self.play(LaggedStartMap(
             FadeInFromDown, algorithms,
             run_time=4,
             lag_ratio=0.4,
@@ -1003,7 +1004,7 @@ class PiComputingAlgorithmsAxes(Scene):
 class StepsOfTheAlgorithm(TeacherStudentsScene):
     def construct(self):
         steps = self.get_steps()
-        steps.arrange_submobjects(
+        steps.arrange(
             DOWN,
             buff=MED_LARGE_BUFF,
             aligned_edge=LEFT,
@@ -1127,7 +1128,7 @@ class CompareToGalacticMass(Scene):
         digits_word.match_color(counter)
         counter.generate_target()
         group = VGroup(counter.target, digits_word)
-        group.arrange_submobjects(
+        group.arrange(
             RIGHT,
             index_of_submobject_to_align=0,
             aligned_edge=DOWN,
@@ -1219,7 +1220,7 @@ class CompareToGalacticMass(Scene):
         black_holes = VGroup(*[
             black_hole.copy() for k in range(10)
         ])
-        black_holes.arrange_submobjects_in_grid(5, 2)
+        black_holes.arrange_in_grid(5, 2)
         black_holes.to_corner(DR)
         random.shuffle(black_holes.submobjects)
         for bh in black_holes:
@@ -1238,7 +1239,7 @@ class CompareToGalacticMass(Scene):
         self.play(
             Write(equals),
             Write(words),
-            LaggedStart(
+            LaggedStartMap(
                 Restore, black_holes,
                 run_time=3
             )
@@ -1275,7 +1276,7 @@ class CompareToGalacticMass(Scene):
             ),
             ReplacementTransform(
                 dots, commas,
-                submobject_mode="lagged_start",
+                lag_ratio=0.5,
                 run_time=2
             )
         )
@@ -1374,7 +1375,7 @@ class CompareAlgorithmToPhysics(PiCreatureScene):
                 target_mode="pondering",
                 look_at_arg=left_rect,
             ),
-            LaggedStart(
+            LaggedStartMap(
                 FadeInFrom, digits,
                 lambda m: (m, LEFT),
                 run_time=5,
@@ -1446,7 +1447,7 @@ class NextVideo(Scene):
         for video in videos:
             video.set_color(BLUE)
             video.set_sheen(0.5, UL)
-        videos.arrange_submobjects(RIGHT, buff=2)
+        videos.arrange(RIGHT, buff=2)
 
         titles = VGroup(
             TextMobject("Here and now"),
@@ -1479,7 +1480,7 @@ class NextVideo(Scene):
             Mortimer()
         )
         friends.set_height(1)
-        friends.arrange_submobjects(RIGHT, buff=MED_SMALL_BUFF)
+        friends.arrange(RIGHT, buff=MED_SMALL_BUFF)
         friends[:2].next_to(randy, LEFT)
         friends[2].next_to(randy, RIGHT)
 
@@ -1491,7 +1492,7 @@ class NextVideo(Scene):
         self.play(Write(dots))
         self.wait()
         self.play(
-            LaggedStart(
+            LaggedStartMap(
                 FadeInFrom, mid_words,
                 lambda m: (m, UP),
                 lag_ratio=0.8,
@@ -1507,11 +1508,11 @@ class NextVideo(Scene):
             ShowCreation(speech_bubble),
             Write(speech_bubble.content),
             randy.change, "maybe", friends[0].eyes,
-            LaggedStart(FadeInFromDown, friends),
+            LaggedStartMap(FadeInFromDown, friends),
             videos.space_out_submobjects, 1.6,
         )
         self.play(
-            LaggedStart(
+            LaggedStartMap(
                 ApplyMethod, friends,
                 lambda m: (m.change, "pondering"),
                 run_time=1,
@@ -1573,6 +1574,7 @@ class Thumbnail(BlocksAndWallExample, MovingCameraScene):
         "count_clacks": False,
         "show_flash_animations": False,
         "floor_y": -3.0,
+        "include_sound": False,
     }
 
     def setup(self):
@@ -1581,6 +1583,15 @@ class Thumbnail(BlocksAndWallExample, MovingCameraScene):
 
     def construct(self):
         self.camera_frame.shift(0.9 * UP)
+        # self.mobjects.insert(
+        #     0,
+        #     FullScreenFadeRectangle(
+        #         color=DARK_GREY,
+        #         opacity=0.5,
+        #         sheen_direction=UL,
+        #         sheen=0.5,
+        #     ),
+        # )
         self.thicken_lines()
         self.grow_labels()
         self.add_vector()
@@ -1600,7 +1611,7 @@ class Thumbnail(BlocksAndWallExample, MovingCameraScene):
 
     def add_vector(self):
         blocks = self.blocks
-        arrow = Vector(
+        arrow = self.arrow = Vector(
             2.5 * LEFT,
             color=RED,
             rectangular_stem_width=1.5,
@@ -1613,7 +1624,9 @@ class Thumbnail(BlocksAndWallExample, MovingCameraScene):
         self.add(arrow)
 
     def add_text(self):
-        question = TextMobject("How many\\\\collisions?")
+        question = self.question = TextMobject(
+            "How many\\\\collisions?"
+        )
         question.scale(2.5)
         question.to_edge(UP)
         question.set_color(YELLOW)
