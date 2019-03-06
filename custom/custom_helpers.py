@@ -3,9 +3,9 @@
 import numpy as np
 import random
 
-from constants import *
-from mobject.types.vectorized_mobject import VGroup
-from utils.color import rgb_to_color, color_to_rgb
+from manimlib.constants import *
+from manimlib.mobject.types.vectorized_mobject import VGroup
+from manimlib.utils.color import rgb_to_color, color_to_rgb
 
 
 def list_shuffle(l):
@@ -48,6 +48,5 @@ def brighten(color, weight = 0.3):
 
 def darken(color, weight = 0.3):
     return tweak_color(color, BLACK, weight)
-
 
 
