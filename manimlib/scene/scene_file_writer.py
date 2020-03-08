@@ -7,13 +7,13 @@ import _thread as thread
 from time import sleep
 import datetime
 
+import manimlib.constants as consts
 from manimlib.constants import FFMPEG_BIN
 from manimlib.constants import STREAMING_IP
 from manimlib.constants import STREAMING_PORT
 from manimlib.constants import STREAMING_PROTOCOL
-from manimlib.constants import VIDEO_DIR
 from manimlib.utils.config_ops import digest_config
-from manimlib.utils.file_ops import guarantee_existance
+from manimlib.utils.file_ops import guarantee_existence
 from manimlib.utils.file_ops import add_extension_if_not_present
 from manimlib.utils.file_ops import get_sorted_integer_files
 from manimlib.utils.sounds import get_full_sound_file_path
@@ -27,12 +27,14 @@ class SceneFileWriter(object):
         "png_mode": "RGBA",
         "save_last_frame": False,
         "movie_file_extension": ".mp4",
+        "gif_file_extension": ".gif",
         "livestreaming": False,
         "to_twitch": False,
         "twitch_key": None,
         # Previous output_file_name
         # TODO, address this in extract_scene et. al.
         "file_name": None,
+        "input_file_path": "",  # ??
         "output_directory": None,
     }
 
@@ -45,55 +47,68 @@ class SceneFileWriter(object):
 
     # Output directories and files
     def init_output_directories(self):
-        output_directory = self.output_directory or self.get_default_output_directory()
-        file_name = self.file_name or self.get_default_file_name()
+        module_directory = self.output_directory or self.get_default_module_directory()
+        scene_name = self.file_name or self.get_default_scene_name()
         if self.save_last_frame:
-            image_dir = guarantee_existance(os.path.join(
-                VIDEO_DIR,
-                output_directory,
-                self.get_image_directory(),
-            ))
+            if consts.VIDEO_DIR != "":
+                image_dir = guarantee_existence(os.path.join(
+                    consts.VIDEO_DIR,
+                    module_directory,
+                    "images",
+                ))
+            else:
+                image_dir = guarantee_existence(os.path.join(
+                    consts.VIDEO_OUTPUT_DIR,
+                    "images",
+                ))
             self.image_file_path = os.path.join(
                 image_dir,
-                add_extension_if_not_present(file_name, ".png")
+                add_extension_if_not_present(scene_name, ".png")
             )
         if self.write_to_movie:
-            movie_dir = guarantee_existance(os.path.join(
-                VIDEO_DIR,
-                output_directory,
-                self.get_movie_directory(),
-            ))
+            if consts.VIDEO_DIR != "":
+                movie_dir = guarantee_existence(os.path.join(
+                    consts.VIDEO_DIR,
+                    module_directory,
+                    self.get_resolution_directory(),
+                ))
+            else:
+                movie_dir = guarantee_existence(consts.VIDEO_OUTPUT_DIR)
             self.movie_file_path = os.path.join(
                 movie_dir,
                 add_extension_if_not_present(
-                    file_name, self.movie_file_extension
+                    scene_name, self.movie_file_extension
                 )
             )
-            self.partial_movie_directory = guarantee_existance(os.path.join(
+            self.gif_file_path = os.path.join(
                 movie_dir,
-                self.get_partial_movie_directory(),
-                file_name,
+                add_extension_if_not_present(
+                    scene_name, self.gif_file_extension
+                )
+            )
+            self.partial_movie_directory = guarantee_existence(os.path.join(
+                movie_dir,
+                "partial_movie_files",
+                scene_name,
             ))
 
-    def get_default_output_directory(self):
-        scene_module = self.scene.__class__.__module__
-        return scene_module.replace(".", os.path.sep)
+    def get_default_module_directory(self):
+        filename = os.path.basename(self.input_file_path)
+        root, _ = os.path.splitext(filename)
+        return root
 
-    def get_default_file_name(self):
-        return self.scene.__class__.__name__
+    def get_default_scene_name(self):
+        if self.file_name is None:
+            return self.scene.__class__.__name__
+        else:
+            return self.file_name
 
-    def get_movie_directory(self):
+    def get_resolution_directory(self):
         pixel_height = self.scene.camera.pixel_height
         frame_rate = self.scene.camera.frame_rate
         return "{}p{}".format(
             pixel_height, frame_rate
         )
-
-    def get_image_directory(self):
-        return "images"
-
-    def get_partial_movie_directory(self):
-        return "partial_movie_files"
 
     # Directory getters
     def get_image_file_path(self):
@@ -216,16 +231,16 @@ class SceneFileWriter(object):
             '-pix_fmt', 'rgba',
             '-r', str(fps),  # frames per second
             '-i', '-',  # The imput comes from a pipe
-            '-c:v', 'h264_nvenc',
             '-an',  # Tells FFMPEG not to expect any audio
             '-loglevel', 'error',
         ]
+        # TODO, the test for a transparent background should not be based on
+        # the file extension.
         if self.movie_file_extension == ".mov":
-            # This is if the background of the exported video
-            # should be transparent.
+            # This is if the background of the exported
+            # video should be transparent.
             command += [
                 '-vcodec', 'qtrle',
-                # '-vcodec', 'png',
             ]
         else:
             command += [
@@ -298,8 +313,8 @@ class SceneFileWriter(object):
             '-f', 'concat',
             '-safe', '0',
             '-i', file_list,
-            '-c', 'copy',
             '-loglevel', 'error',
+            '-c', 'copy',
             movie_file_path
         ]
         if not self.includes_sound:
@@ -337,7 +352,7 @@ class SceneFileWriter(object):
             ]
             subprocess.call(commands)
             shutil.move(temp_file_path, movie_file_path)
-            subprocess.call(["rm", sound_file_path])
+            os.remove(sound_file_path)
 
         self.print_file_ready_message(movie_file_path)
 

@@ -436,7 +436,7 @@ class Bubble(SVGMobject):
         self.stretch_to_fit_height(self.height)
         self.stretch_to_fit_width(self.width)
         if self.direction[0] > 0:
-            Mobject.flip(self)
+            self.flip()
         self.direction_was_specified = ("direction" in kwargs)
         self.content = Mobject()
 
@@ -455,9 +455,10 @@ class Bubble(SVGMobject):
         mover.shift(point - self.get_tip())
         return self
 
-    def flip(self):
-        Mobject.flip(self)
-        self.direction = -np.array(self.direction)
+    def flip(self, axis=UP):
+        Mobject.flip(self, axis=axis)
+        if abs(axis[1]) > 0:
+            self.direction = -np.array(self.direction)
         return self
 
     def pin_to(self, mobject):
@@ -707,9 +708,10 @@ class Logo(VMobject):
             endpoint=False,
         )
         radii[:2] = radii[1::-1]  # Swap first two
-        radii[-1] = interpolate(
-            radii[-1], self.pupil_radius, 0.25
-        )
+        if self.n_spike_layers > 2:
+            radii[-1] = interpolate(
+                radii[-1], self.pupil_radius, 0.25
+            )
 
         for radius in radii:
             tip_angle = self.spike_angle

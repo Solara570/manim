@@ -9,6 +9,7 @@ import sys
 from colour import Color
 import numpy as np
 
+import manimlib.constants as consts
 from manimlib.constants import *
 from manimlib.container.container import Container
 from manimlib.utils.color import color_gradient
@@ -109,7 +110,7 @@ class Mobject(Container):
 
     def save_image(self, name=None):
         self.get_image().save(
-            os.path.join(VIDEO_DIR, (name or str(self)) + ".png")
+            os.path.join(consts.VIDEO_DIR, (name or str(self)) + ".png")
         )
 
     def copy(self):
@@ -970,12 +971,6 @@ class Mobject(Container):
                 submob.shuffle(recursive=True)
         random.shuffle(self.submobjects)
 
-    def print_family(self, n_tabs=0):
-        """For debugging purposes"""
-        print("\t" * n_tabs, self, id(self))
-        for submob in self.submobjects:
-            submob.print_family(n_tabs + 1)
-
     # Just here to keep from breaking old scenes.
     def arrange_submobjects(self, *args, **kwargs):
         return self.arrange(*args, **kwargs)
@@ -1087,6 +1082,7 @@ class Mobject(Container):
             mobject1.points, mobject2.points, alpha
         )
         self.interpolate_color(mobject1, mobject2, alpha)
+        return self
 
     def interpolate_color(self, mobject1, mobject2, alpha):
         pass  # To implement in subclass

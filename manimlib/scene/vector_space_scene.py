@@ -141,7 +141,7 @@ class VectorScene(Scene):
             angle = vector.get_angle()
             if not rotate:
                 label.rotate(-angle, about_point=ORIGIN)
-            if direction is "left":
+            if direction == "left":
                 label.shift(-label.get_bottom() + 0.1 * UP)
             else:
                 label.shift(-label.get_top() + 0.1 * DOWN)
@@ -290,7 +290,7 @@ class LinearTransformationScene(VectorScene):
             "axis_config": {
                 "stroke_color": LIGHT_GREY,
             },
-            "number_line_config": {
+            "axis_config": {
                 "color": GREY,
             },
             "background_line_style": {
