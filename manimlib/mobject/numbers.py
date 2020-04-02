@@ -62,7 +62,8 @@ class DecimalNumber(VMobject):
         # to the bottom
         for i, c in enumerate(num_string):
             if c == "-" and len(num_string) > i + 1:
-                self[i].align_to(self[i + 1], alignment_vect=UP)
+                self[i].align_to(self[i + 1], UP)
+                self[i].shift(self[i+1].get_height() * DOWN / 2)
             elif c == ",":
                 self[i].shift(self[i].get_height() * DOWN / 2)
         if self.unit and self.unit.startswith("^"):
@@ -131,14 +132,14 @@ class DecimalNumber(VMobject):
     def get_value(self):
         return self.number
 
+    def increment_value(self, delta_t=1):
+        self.set_value(self.get_value() + delta_t)
+
 
 class Integer(DecimalNumber):
     CONFIG = {
         "num_decimal_places": 0,
     }
-
-    def increment_value(self):
-        self.set_value(self.get_value() + 1)
 
     def get_value(self):
         return int(np.round(super().get_value()))
